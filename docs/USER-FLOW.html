@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoixCourses — Flux Utilisateur v2</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f0f1a; color: #edf2f4; font-family: system-ui, sans-serif; line-height: 1.5; padding: 24px; }
+
+  h1 { font-size: 24px; margin-bottom: 8px; color: #4cc9f0; }
+  h2 { font-size: 18px; margin: 36px 0 16px; color: #ffd166; border-bottom: 1px solid #2b3a55; padding-bottom: 8px; }
+  .subtitle { color: #8d99ae; margin-bottom: 32px; font-size: 14px; }
+
+  .flow { display: flex; flex-direction: column; gap: 0; max-width: 800px; margin: 0 auto; }
+
+  .step {
+    position: relative; padding: 16px 20px 16px 72px;
+    background: #1a1a2e; border: 2px solid #2b3a55; border-radius: 12px;
+  }
+  .step.active { border-color: #4cc9f0; }
+  .step.decision { border-color: #ffd166; background: #1e1a2e; border-style: dashed; }
+  .step.error { border-color: #ff6b8a; }
+  .step.new { border-color: #c77dff; background: #1a1a2e; }
+
+  .step-num {
+    position: absolute; left: 16px; top: 16px;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #4cc9f0; color: #000; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .step.decision .step-num { background: #ffd166; }
+  .step.error .step-num { background: #ff6b8a; }
+  .step.new .step-num { background: #c77dff; }
+
+  .step-title { font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+  .step-desc { color: #a0a8b8; font-size: 14px; }
+  .step-voice { color: #06d6a0; font-size: 13px; margin-top: 6px; font-style: italic; }
+  .step-screen { color: #4cc9f0; font-size: 13px; margin-top: 4px; }
+  .step-aria { color: #ffd166; font-size: 12px; margin-top: 4px; font-family: monospace; }
+  .step-example { background: #111122; border-radius: 8px; padding: 10px 14px; margin-top: 10px; font-size: 13px; border: 1px solid #2b3a55; }
+  .step-example strong { color: #4cc9f0; }
+  .step-example .user { color: #06d6a0; }
+  .step-example .ai { color: #ffd166; }
+
+  .arrow { text-align: center; padding: 4px 0; color: #2b3a55; font-size: 24px; user-select: none; }
+  .arrow.branch { color: #ffd166; font-size: 14px; padding: 6px 0; }
+
+  .branch-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .branch-label { text-align: center; font-size: 12px; font-weight: 700; color: #ffd166; margin-bottom: 6px; }
+  .branch-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+  .tag {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 700; margin-left: 8px; vertical-align: middle;
+  }
+  .tag-new { background: #c77dff; color: #000; }
+  .tag-voice { background: #06d6a0; color: #000; }
+  .tag-api { background: #c77dff; color: #000; }
+  .tag-auto { background: #ffd166; color: #000; }
+  .tag-changed { background: #ff922b; color: #000; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; font-size: 13px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<h1>Flux Utilisateur — VoixCourses MVP v2</h1>
+<p class="subtitle">Mis à jour : ajout phase Clarification + ajout/suppression produits en Phase 3</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#c77dff"></div> Nouveau dans cette version</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ff922b"></div> Modifié</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#4cc9f0"></div> Étape standard</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ffd166"></div> Décision</div>
+</div>
+
+<!-- ═══ PHASE 1 ═══ -->
+<h2>Phase 1 — Première visite (inchangée)</h2>
+<div class="flow">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-title">Arrivée → bienvenue</div>
+    <div class="step-desc">Focus sur le contenu. Annonce de bienvenue.</div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-title">Code postal → magasin sélectionné</div>
+    <div class="step-desc">Saisie CP → liste magasins → sélection → créneau annoncé. Sauvegardé pour les visites suivantes.</div>
+  </div>
+</div>
+
+<!-- ═══ PHASE 2 ═══ -->
+<h2>Phase 2 — Saisie de la liste (inchangée)</h2>
+<div class="flow">
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-title">Saisie texte ou dictée vocale</div>
+    <div class="step-desc">Textarea + bouton Dicter. L'utilisateur entre sa liste en langage naturel.</div>
+    <div class="step-voice">🔊 Exemple dicté : "deux litres de lait demi-écrémé, des pâtes penne, six yaourts nature, du jambon blanc, du savon pour les mains"</div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-title">Clic "Trouver mes produits" <span class="tag tag-api">API</span></div>
+    <div class="step-desc">La liste est envoyée à Claude pour parsing + détection des ambiguïtés.</div>
+  </div>
+</div>
+
+<!-- ═══ PHASE 2.5 — NOUVEAU ═══ -->
+<h2>Phase 2.5 — Clarification de la liste <span class="tag tag-new">NOUVEAU</span></h2>
+<div class="flow">
+  <div class="step new">
+    <div class="step-num">5</div>
+    <div class="step-title">Claude analyse la liste</div>
+    <div class="step-desc">Claude identifie 3 cas pour chaque item :<br>
+      <strong style="color:#06d6a0">✓ Clair</strong> — "2 litres de lait demi-écrémé" → requête prête<br>
+      <strong style="color:#ffd166">? Ambigu</strong> — "du lait" → quel type ? quelle quantité ?<br>
+      <strong style="color:#ff6b8a">✗ Incompris</strong> — "des pâtes penne" mal dicté en "des passes pen" → correction nécessaire
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step decision new">
+    <div class="step-num">?</div>
+    <div class="step-title">Y a-t-il des items ambigus ou incompris ?</div>
+    <div class="step-desc">Si tout est clair → passer directement à la Phase 3 (recherche).<br>Si des items nécessitent clarification → afficher l'écran de clarification.</div>
+  </div>
+
+  <div class="arrow branch">↙ Tout clair → Phase 3 &nbsp;&nbsp;&nbsp; Items à clarifier ↘</div>
+
+  <div class="step new active" style="margin-top:8px;">
+    <div class="step-num">6</div>
+    <div class="step-title">Écran de clarification</div>
+    <div class="step-desc">La liste parsée est affichée. Les items clairs sont pré-validés (vert). Les items ambigus/incompris sont mis en avant avec des questions.</div>
+    <div class="step-voice">🔊 "J'ai compris 5 produits. 3 sont clairs. 2 nécessitent une précision."</div>
+    <div class="step-screen">📖 "Vérification de votre liste — heading level 1. 5 produits. 2 à clarifier."</div>
+
+    <div class="step-example">
+      <strong>Liste parsée :</strong><br><br>
+      <span style="color:#06d6a0">✓</span> 2 litres de lait demi-écrémé → <em>recherche : "lait demi ecreme 2L"</em><br>
+      <span style="color:#06d6a0">✓</span> du jambon blanc → <em>recherche : "jambon blanc"</em><br>
+      <span style="color:#06d6a0">✓</span> du savon pour les mains → <em>recherche : "savon mains"</em><br><br>
+      <span style="color:#ffd166">?</span> <strong>des pâtes</strong> — Quel type ? <button style="background:#2b3a55;color:#ffd166;border:1px solid #ffd166;padding:2px 8px;border-radius:4px;font-size:12px;margin:2px;">spaghetti</button> <button style="background:#2b3a55;color:#ffd166;border:1px solid #ffd166;padding:2px 8px;border-radius:4px;font-size:12px;margin:2px;">penne</button> <button style="background:#2b3a55;color:#ffd166;border:1px solid #ffd166;padding:2px 8px;border-radius:4px;font-size:12px;margin:2px;">coquillettes</button> <button style="background:#2b3a55;color:#ffd166;border:1px solid #ffd166;padding:2px 8px;border-radius:4px;font-size:12px;margin:2px;">peu importe</button><br><br>
+      <span style="color:#ff6b8a">✗</span> <strong>"des passes pen"</strong> — Incompris. Vouliez-vous dire : <button style="background:#2b3a55;color:#ff6b8a;border:1px solid #ff6b8a;padding:2px 8px;border-radius:4px;font-size:12px;margin:2px;">des pâtes penne</button> <button style="background:#2b3a55;color:#ff6b8a;border:1px solid #ff6b8a;padding:2px 8px;border-radius:4px;font-size:12px;margin:2px;">des pastèques</button> <button style="background:#2b3a55;color:#ff6b8a;border:1px solid #ff6b8a;padding:2px 8px;border-radius:4px;font-size:12px;margin:2px;">autre chose</button>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step new">
+    <div class="step-num">7</div>
+    <div class="step-title">Corrections et précisions</div>
+    <div class="step-desc">L'utilisateur clique sur les suggestions ou tape/dicte une correction. Chaque clarification met à jour la liste en temps réel.</div>
+    <div class="step-voice">🔊 (utilisateur clique "penne") "Pâtes penne, c'est noté." <br>🔊 (utilisateur clique "des pâtes penne") "Corrigé : des pâtes penne."</div>
+    <div class="step-aria">aria-live: "Liste mise à jour. 5 sur 5 produits prêts."</div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step new active">
+    <div class="step-num">8</div>
+    <div class="step-title">Liste validée → "Lancer la recherche"</div>
+    <div class="step-desc">Tous les items sont clairs (verts). L'utilisateur confirme la liste complète avant la recherche.</div>
+    <div class="step-voice">🔊 "Votre liste est prête : lait demi-écrémé 2L, pâtes penne, yaourts nature, jambon blanc, savon mains. 5 produits. Appuyez Entrée pour lancer la recherche."</div>
+
+    <div class="step-example">
+      <strong>Liste finale :</strong><br>
+      <span style="color:#06d6a0">✓</span> Lait demi-écrémé — 2L<br>
+      <span style="color:#06d6a0">✓</span> Pâtes penne<br>
+      <span style="color:#06d6a0">✓</span> Yaourts nature — 6 pots<br>
+      <span style="color:#06d6a0">✓</span> Jambon blanc<br>
+      <span style="color:#06d6a0">✓</span> Savon pour les mains<br><br>
+      <div style="text-align:center;"><button style="background:#4cc9f0;color:#000;padding:12px 32px;border:none;border-radius:8px;font-weight:700;font-size:15px;cursor:pointer;">Lancer la recherche</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PHASE 3 — MODIFIÉE ═══ -->
+<h2>Phase 3 — Sélection des produits <span class="tag tag-changed">MODIFIÉ</span></h2>
+<div class="flow">
+  <div class="step">
+    <div class="step-num">9</div>
+    <div class="step-title">Résultats affichés <span class="tag tag-api">API</span></div>
+    <div class="step-desc">GET /s?q= pour chaque item → meilleur match affiché. Résumé vocal complet.</div>
+    <div class="step-voice">🔊 "5 produits trouvés. Total estimé 8 euros 10. Confirmez, modifiez, ou ajoutez des produits."</div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step decision">
+    <div class="step-num">?</div>
+    <div class="step-title">Pour chaque produit : 3 actions possibles <span class="tag tag-changed">MODIFIÉ</span></div>
+    <div class="step-desc">L'utilisateur navigue la liste. Pour chaque produit, 3 boutons :</div>
+  </div>
+
+  <div class="arrow branch">↙ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ↓ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ↘</div>
+
+  <div class="branch-container branch-3">
+    <div>
+      <div class="branch-label" style="color:#06d6a0;">CONFIRMER</div>
+      <div class="step" style="margin:0;border-color:#06d6a0;padding-left:50px;">
+        <div class="step-num" style="background:#06d6a0;width:30px;height:30px;font-size:14px;">✓</div>
+        <div class="step-title" style="font-size:14px;">OK</div>
+        <div class="step-desc">Produit validé</div>
+      </div>
+    </div>
+    <div>
+      <div class="branch-label" style="color:#ffd166;">AUTRE CHOIX</div>
+      <div class="step" style="margin:0;border-color:#ffd166;padding-left:50px;">
+        <div class="step-num" style="background:#ffd166;width:30px;height:30px;font-size:14px;">↻</div>
+        <div class="step-title" style="font-size:14px;">Remplacer</div>
+        <div class="step-desc">Alternative suivante</div>
+      </div>
+    </div>
+    <div>
+      <div class="branch-label" style="color:#ff6b8a;">SUPPRIMER</div>
+      <div class="step" style="margin:0;border-color:#ff6b8a;padding-left:50px;">
+        <div class="step-num" style="background:#ff6b8a;width:30px;height:30px;font-size:14px;">✗</div>
+        <div class="step-title" style="font-size:14px;">Retirer</div>
+        <div class="step-desc">Enlever de la liste</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step new active">
+    <div class="step-num" style="background:#c77dff;">+</div>
+    <div class="step-title">Ajouter un produit <span class="tag tag-new">NOUVEAU</span></div>
+    <div class="step-desc">En bas de la liste : un champ "Ajouter un produit" (texte ou voix). L'utilisateur peut compléter sa liste sans revenir en arrière.</div>
+    <div class="step-example">
+      <strong>Ajouter un produit :</strong><br><br>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" placeholder="Ex: du beurre, des oeufs..." style="flex:1;padding:8px 12px;background:#0f0f1a;border:2px solid #2b3a55;border-radius:6px;color:#edf2f4;font-size:14px;">
+        <button style="background:#c77dff;color:#000;padding:8px 16px;border:none;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;">Ajouter</button>
+      </div>
+      <div style="color:#8d99ae;font-size:12px;margin-top:6px;">→ Recherche immédiate, le produit apparaît dans la liste</div>
+    </div>
+    <div class="step-voice">🔊 (utilisateur tape "du beurre") → recherche → "Beurre doux Président, 2 euros 45. Ajouté à votre liste."</div>
+    <div class="step-aria">aria-live: "Beurre doux Président ajouté. 6 produits, total 10 euros 55."</div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step active">
+    <div class="step-num">10</div>
+    <div class="step-title">Récapitulatif → "Ajouter au panier"</div>
+    <div class="step-desc">Quand l'utilisateur est satisfait de sa liste (produits confirmés, ajoutés, supprimés). Résumé vocal du total avant validation.</div>
+    <div class="step-voice">🔊 "6 produits confirmés pour 10 euros 55. Appuyez Entrée pour ajouter au panier Carrefour."</div>
+  </div>
+</div>
+
+<!-- ═══ PHASE 4 ═══ -->
+<h2>Phase 4 — Panier et paiement (inchangée)</h2>
+<div class="flow">
+  <div class="step">
+    <div class="step-num">11</div>
+    <div class="step-title">Ajout au panier → PATCH /api/cart × N</div>
+    <div class="step-desc">Progression annoncée. "Ajout 1 sur 6... 2 sur 6..."</div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="step active">
+    <div class="step-num">12</div>
+    <div class="step-title">Résumé panier + créneau</div>
+    <div class="step-desc">Récap complet, total, frais, créneau. Bouton "Valider et payer sur Carrefour".</div>
+    <div class="step-voice">🔊 "Panier rempli. 6 produits pour 10 euros 55. Créneau : dimanche 13 avril 8h-10h, Drive Mondelange."</div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="step" style="border-color:#06d6a0;">
+    <div class="step-num" style="background:#06d6a0;">→</div>
+    <div class="step-title">Redirect vers carrefour.fr/mon-panier</div>
+    <div class="step-desc">L'utilisateur se connecte et paye sur Carrefour. Le panier est pré-rempli.</div>
+  </div>
+</div>
+
+<!-- ═══ CAS D'ERREUR ═══ -->
+<h2>Cas d'erreur (inchangés)</h2>
+<div class="flow">
+  <div class="step error">
+    <div class="step-num">!</div>
+    <div class="step-title">Produit non trouvé → suggestion reformulation</div>
+    <div class="step-voice">🔊 "Aucun résultat pour crème solaire bio. Essayez : crème solaire, ou protection solaire."</div>
+  </div>
+  <div class="arrow" style="height:8px;"></div>
+  <div class="step error">
+    <div class="step-num">!</div>
+    <div class="step-title">Produit indisponible → alternative automatique</div>
+    <div class="step-voice">🔊 "Lait Lactel indisponible. Alternative : Lait Candia, 1 euro 30."</div>
+  </div>
+  <div class="arrow" style="height:8px;"></div>
+  <div class="step error">
+    <div class="step-num">!</div>
+    <div class="step-title">Erreur réseau → retry avec message</div>
+    <div class="step-voice">🔊 "Carrefour est temporairement indisponible. Nouvelle tentative dans 5 secondes."</div>
+  </div>
+</div>
+
+<!-- ═══ RÉSUMÉ DES CHANGEMENTS ═══ -->
+<h2>Résumé des changements v2</h2>
+<div class="flow">
+  <div class="step new" style="padding-left:20px;">
+    <div class="step-title"><span class="tag tag-new">NOUVEAU</span> Phase 2.5 — Clarification</div>
+    <div class="step-desc" style="margin-top:8px;">
+      <strong>Pourquoi :</strong> La dictée vocale produit des erreurs. Les listes naturelles sont souvent ambiguës ("du lait" sans préciser le type).<br><br>
+      <strong>Comment :</strong> Claude analyse chaque item et le classe en ✓ clair / ? ambigu / ✗ incompris. Les items ambigus proposent des choix (boutons). Les items incompris proposent des corrections. L'utilisateur valide la liste complète avant la recherche.<br><br>
+      <strong>UX :</strong> Cette étape est SKIPPÉE si tout est clair — pas d'étape inutile. L'annonce vocale résume : "3 clairs, 2 à préciser."
+    </div>
+  </div>
+  <div class="arrow" style="height:8px;"></div>
+  <div class="step" style="padding-left:20px;border-color:#ff922b;">
+    <div class="step-title"><span class="tag tag-changed">MODIFIÉ</span> Phase 3 — Ajout/Suppression</div>
+    <div class="step-desc" style="margin-top:8px;">
+      <strong>Ajouté :</strong> Bouton "Supprimer" sur chaque produit (en plus de Confirmer/Autre choix).<br><br>
+      <strong>Ajouté :</strong> Champ "Ajouter un produit" en bas de la liste — recherche immédiate et ajout sans revenir en arrière.<br><br>
+      <strong>UX :</strong> Le total se met à jour en temps réel et est annoncé à chaque modification.
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

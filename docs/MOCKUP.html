@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoixCourses — Mockup Accessible MVP v2</title>
+<style>
+  :root {
+    /* Thème sombre — contraste AAA (7:1+) */
+    --bg: #0f0f1a;
+    --bg-surface: #1a1a2e;
+    --text: #f0f0f5;
+    --text-muted: #a0a8b8;
+    --accent: #4cc9f0;
+    --accent-hover: #7ae0ff;
+    --danger: #ff6b8a;
+    --success: #2ee8a5;
+    --border: #2b3a55;
+    --focus: #ffd166;
+    --font-size-base: 1.125rem; /* 18px */
+  }
+
+  .theme-light {
+    --bg: #ffffff;
+    --bg-surface: #f5f5f7;
+    --text: #1a1a2e;
+    --text-muted: #555566;
+    --accent: #0062cc;
+    --accent-hover: #004fa3;
+    --danger: #c41640;
+    --success: #0a7a52;
+    --border: #ccccdd;
+    --focus: #e67700;
+  }
+
+  .theme-high-contrast {
+    --bg: #000000;
+    --bg-surface: #1a1a1a;
+    --text: #ffffff;
+    --text-muted: #cccccc;
+    --accent: #ffff00;
+    --accent-hover: #ffff66;
+    --danger: #ff4444;
+    --success: #44ff44;
+    --border: #ffffff;
+    --focus: #ffff00;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: var(--font-size-base); }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  /* Skip link */
+  .skip {
+    position: absolute; top: -100px; left: 8px;
+    background: var(--focus); color: #000; padding: 12px 20px;
+    font-weight: 700; border-radius: 0 0 8px 8px; z-index: 100;
+    font-size: 1rem; text-decoration: none;
+  }
+  .skip:focus { top: 0; }
+
+  /* Focus visible — AAA compliant, 3px ring */
+  :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+  }
+
+  /* Settings bar */
+  .settings-bar {
+    background: var(--bg-surface); border-bottom: 1px solid var(--border);
+    padding: 8px 16px; display: flex; align-items: center; gap: 12px;
+    flex-wrap: wrap; font-size: 0.8rem;
+  }
+  .settings-bar label { font-weight: 600; color: var(--text-muted); }
+  .settings-bar select, .settings-bar button {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; cursor: pointer;
+  }
+  .settings-bar button:hover { border-color: var(--accent); }
+  .settings-bar .sep { border-left: 1px solid var(--border); height: 20px; }
+  .voice-toggle { display: flex; align-items: center; gap: 6px; }
+  .voice-toggle input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+
+  /* Tabs */
+  .tabs {
+    display: flex; gap: 2px; padding: 8px 16px;
+    background: var(--bg-surface); position: sticky; top: 0; z-index: 10;
+  }
+  .tab {
+    flex: 1; padding: 14px 8px; text-align: center; cursor: pointer;
+    border-radius: 8px; font-weight: 600; font-size: 0.9rem;
+    transition: all 0.15s; border: 2px solid transparent; background: none; color: var(--text);
+  }
+  .tab:hover { background: var(--border); }
+  .tab[aria-selected="true"] { background: var(--accent); color: #000; }
+  .tab .step-num { display: block; font-size: 0.75rem; font-weight: 400; opacity: 0.7; margin-bottom: 2px; }
+
+  .screen { display: none; padding: 24px 16px; max-width: 700px; margin: 0 auto; }
+  .screen[aria-hidden="false"] { display: block; }
+
+  /* Headings — semantic hierarchy */
+  h1 { font-size: 1.8rem; margin-bottom: 4px; }
+  h2 { font-size: 1.3rem; margin-bottom: 16px; }
+  h3 { font-size: 1.1rem; }
+  .subtitle { color: var(--text-muted); margin-bottom: 28px; }
+
+  /* Voice announcement banner */
+  .voice-banner {
+    background: var(--bg-surface); border-left: 4px solid var(--accent);
+    padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 20px;
+    color: var(--text-muted); font-size: 0.95rem;
+  }
+  .voice-banner strong { color: var(--text); }
+
+  /* Form */
+  label { display: block; font-size: 1.05rem; font-weight: 600; margin-bottom: 6px; }
+  .help-text { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; }
+
+  textarea {
+    width: 100%; padding: 16px; border-radius: 10px;
+    background: var(--bg-surface); border: 2px solid var(--border);
+    color: var(--text); font-size: 1.05rem; resize: vertical;
+    line-height: 1.5; font-family: inherit; min-height: 120px;
+  }
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--text-muted); opacity: 0.6; }
+
+  .btn-row { display: flex; gap: 10px; margin-top: 16px; }
+  .btn {
+    padding: 14px 24px; border-radius: 10px; font-size: 1.05rem;
+    font-weight: 700; cursor: pointer; border: 2px solid transparent;
+    transition: all 0.15s; text-align: center;
+  }
+  .btn-primary { background: var(--accent); color: #000; flex: 1; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-secondary { background: var(--bg-surface); color: var(--text); border-color: var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); }
+  .btn-success { background: var(--success); color: #000; }
+  .btn-success:hover { opacity: 0.9; }
+  .btn-outline-success { background: transparent; color: var(--success); border-color: var(--success); }
+  .btn-outline-success:hover { background: var(--success); color: #000; }
+  .btn-outline-danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+  .btn-outline-danger:hover { background: var(--danger); color: #000; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-full { width: 100%; }
+  .btn-lg { padding: 18px 24px; font-size: 1.15rem; }
+
+  /* Product cards */
+  .product-card {
+    background: var(--bg-surface); border: 2px solid var(--border);
+    border-radius: 12px; padding: 18px; margin-bottom: 14px;
+    transition: border-color 0.15s;
+  }
+  .product-card.confirmed { border-color: var(--success); }
+  .product-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .product-info { flex: 1; }
+  .product-title { font-size: 1.05rem; font-weight: 600; }
+  .product-meta { color: var(--text-muted); font-size: 0.9rem; margin-top: 4px; }
+  .product-price { text-align: right; white-space: nowrap; }
+  .price-main { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+  .price-unit { font-size: 0.8rem; color: var(--text-muted); }
+  .product-actions { display: flex; gap: 8px; margin-top: 14px; }
+  .product-actions .btn { padding: 10px 18px; font-size: 0.9rem; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; margin-left: 8px; }
+  .nutri-a { background: #06d6a0; color: #000; }
+  .nutri-b { background: #82c91e; color: #000; }
+  .nutri-c { background: #ffd166; color: #000; }
+  .nutri-d { background: #ff922b; color: #000; }
+
+  /* Cart */
+  .cart-box {
+    background: var(--bg-surface); border: 2px solid var(--accent);
+    border-radius: 12px; padding: 22px;
+  }
+  .cart-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .cart-item:last-of-type { border: none; }
+  .cart-total {
+    display: flex; justify-content: space-between;
+    padding-top: 14px; border-top: 2px solid var(--border); margin-top: 10px;
+    font-size: 1.25rem; font-weight: 700;
+  }
+  .slot-info {
+    background: var(--bg); border-radius: 8px; padding: 14px;
+    margin-top: 14px; color: var(--text-muted); font-size: 0.9rem;
+    border: 1px solid var(--border);
+  }
+  .slot-info strong { color: var(--text); }
+
+  .back-link {
+    color: var(--text-muted); text-decoration: underline;
+    cursor: pointer; font-size: 0.9rem; margin-top: 20px;
+    display: inline-block; background: none; border: none; font-family: inherit;
+  }
+
+  /* sr-only */
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+
+  @media (max-width: 600px) {
+    .screen { padding: 16px; }
+    .btn-row { flex-direction: column; }
+    h1 { font-size: 1.5rem; }
+    .product-header { flex-direction: column; }
+    .product-price { text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Skip link — premier élément focusable -->
+<a href="#main" class="skip">Aller au contenu principal</a>
+
+<!-- Barre de paramètres accessibilité -->
+<div class="settings-bar" role="region" aria-label="Paramètres d'accessibilité">
+  <label for="theme-select">Thème :</label>
+  <select id="theme-select" onchange="setTheme(this.value)">
+    <option value="dark">Sombre</option>
+    <option value="light">Clair</option>
+    <option value="high-contrast">Contraste élevé</option>
+  </select>
+
+  <div class="sep" aria-hidden="true"></div>
+
+  <label for="font-size">Taille :</label>
+  <select id="font-size" onchange="setFontSize(this.value)">
+    <option value="1.125rem">Normal</option>
+    <option value="1.3rem">Grand</option>
+    <option value="1.5rem">Très grand</option>
+    <option value="1.8rem">Maximum</option>
+  </select>
+
+  <div class="sep" aria-hidden="true"></div>
+
+  <div class="voice-toggle">
+    <input type="checkbox" id="voice-output" />
+    <label for="voice-output">Retour vocal</label>
+  </div>
+</div>
+
+<!-- Navigation par étapes (tabs) -->
+<div role="tablist" aria-label="Étapes de commande" class="tabs">
+  <button role="tab" id="tab-input" class="tab" aria-selected="true" aria-controls="screen-input" onclick="showScreen('input')">
+    <span class="step-num">Étape 1</span>Ma liste
+  </button>
+  <button role="tab" id="tab-results" class="tab" aria-selected="false" aria-controls="screen-results" onclick="showScreen('results')">
+    <span class="step-num">Étape 2</span>Produits
+  </button>
+  <button role="tab" id="tab-cart" class="tab" aria-selected="false" aria-controls="screen-cart" onclick="showScreen('cart')">
+    <span class="step-num">Étape 3</span>Panier
+  </button>
+</div>
+
+<!-- Zone d'annonces vocales (pré-rendu, jamais supprimée du DOM) -->
+<div role="status" aria-live="polite" aria-atomic="true" class="sr-only" id="live-announcer"></div>
+
+<!-- ═══ ÉCRAN 1: SAISIE ═══ -->
+<section id="screen-input" role="tabpanel" aria-labelledby="tab-input" aria-hidden="false" class="screen" tabindex="-1">
+  <div id="main">
+    <h1>VoixCourses</h1>
+    <p class="subtitle">Dictez ou tapez votre liste de courses. L'IA trouve les produits et remplit votre panier Carrefour.</p>
+
+    <form onsubmit="event.preventDefault(); showScreen('results');">
+      <label for="grocery-list">Votre liste de courses</label>
+      <p class="help-text" id="grocery-help">Écrivez vos produits séparés par des virgules. Exemple : 2 litres de lait, des pâtes, 6 yaourts nature</p>
+
+      <textarea
+        id="grocery-list"
+        aria-describedby="grocery-help"
+        placeholder="2 litres de lait demi-écrémé, des pâtes penne, 6 yaourts nature, du jambon blanc..."
+        rows="5"
+      >2 litres de lait demi-écrémé, des pâtes penne, 6 yaourts nature, du jambon blanc, du savon pour les mains</textarea>
+
+      <div class="btn-row">
+        <button type="button" class="btn btn-secondary" aria-label="Dicter ma liste de courses" aria-pressed="false">
+          Dicter
+        </button>
+        <button type="submit" class="btn btn-primary">
+          Trouver mes produits
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- ═══ ÉCRAN 2: RÉSULTATS ═══ -->
+<section id="screen-results" role="tabpanel" aria-labelledby="tab-results" aria-hidden="true" class="screen" tabindex="-1">
+  <h1>Produits trouvés</h1>
+
+  <div class="voice-banner" role="status">
+    <strong>5 produits trouvés sur 5.</strong> Vérifiez et confirmez chaque produit. Utilisez les boutons "Confirmer" ou "Autre choix".
+  </div>
+
+  <h2 id="results-heading">
+    Résultats
+    <span aria-live="polite" aria-atomic="true">(4 confirmés sur 5)</span>
+  </h2>
+
+  <ul role="list" aria-labelledby="results-heading" style="list-style:none;">
+    <!-- Produit 1 — confirmé -->
+    <li>
+      <article class="product-card confirmed" aria-labelledby="p1-name">
+        <div class="product-header">
+          <div class="product-info">
+            <h3 class="product-title" id="p1-name">Lait Demi-Écrémé UHT Vitamine D LACTEL</h3>
+            <p class="product-meta">LACTEL — la bouteille 1L<span class="badge nutri-a">Nutriscore A</span></p>
+          </div>
+          <div class="product-price">
+            <div class="price-main" aria-label="Prix : 1 euro 26">1,26€</div>
+            <div class="price-unit">1,26 € / L</div>
+          </div>
+        </div>
+        <div class="product-actions">
+          <button class="btn btn-success" disabled aria-label="Lait Lactel confirmé">Confirmé</button>
+        </div>
+      </article>
+    </li>
+
+    <!-- Produit 2 — confirmé -->
+    <li>
+      <article class="product-card confirmed" aria-labelledby="p2-name">
+        <div class="product-header">
+          <div class="product-info">
+            <h3 class="product-title" id="p2-name">Pâtes Spaghetti BARILLA</h3>
+            <p class="product-meta">BARILLA — le paquet de 500g</p>
+          </div>
+          <div class="product-price">
+            <div class="price-main" aria-label="Prix : 1 euro 45">1,45€</div>
+            <div class="price-unit">2,90 € / KG</div>
+          </div>
+        </div>
+        <div class="product-actions">
+          <button class="btn btn-success" disabled aria-label="Pâtes Barilla confirmé">Confirmé</button>
+        </div>
+      </article>
+    </li>
+
+    <!-- Produit 3 — à confirmer -->
+    <li>
+      <article class="product-card" aria-labelledby="p3-name">
+        <div class="product-header">
+          <div class="product-info">
+            <h3 class="product-title" id="p3-name">Yaourts Nature CARREFOUR CLASSIC'</h3>
+            <p class="product-meta">CARREFOUR CLASSIC' — les 16 pots de 125g<span class="badge nutri-a">Nutriscore A</span></p>
+          </div>
+          <div class="product-price">
+            <div class="price-main" aria-label="Prix : 2 euros 29">2,29€</div>
+            <div class="price-unit">1,14 € / KG</div>
+          </div>
+        </div>
+        <div class="product-actions">
+          <button class="btn btn-outline-success" aria-label="Confirmer Yaourts Nature Carrefour Classic">Confirmer</button>
+          <button class="btn btn-outline-danger" aria-label="Choisir un autre yaourt nature">Autre choix</button>
+        </div>
+      </article>
+    </li>
+
+    <!-- Produit 4 — confirmé -->
+    <li>
+      <article class="product-card confirmed" aria-labelledby="p4-name">
+        <div class="product-header">
+          <div class="product-info">
+            <h3 class="product-title" id="p4-name">Jambon Le Bon Paris à L'étouffé HERTA</h3>
+            <p class="product-meta">HERTA — la barquette de 170g<span class="badge nutri-c">Nutriscore C</span></p>
+          </div>
+          <div class="product-price">
+            <div class="price-main" aria-label="Prix : 2 euros 15">2,15€</div>
+            <div class="price-unit">12,65 € / KG</div>
+          </div>
+        </div>
+        <div class="product-actions">
+          <button class="btn btn-success" disabled aria-label="Jambon Herta confirmé">Confirmé</button>
+        </div>
+      </article>
+    </li>
+
+    <!-- Produit 5 — confirmé -->
+    <li>
+      <article class="product-card confirmed" aria-labelledby="p5-name">
+        <div class="product-header">
+          <div class="product-info">
+            <h3 class="product-title" id="p5-name">Savon Liquide Mains Pêche CARREFOUR SOFT</h3>
+            <p class="product-meta">CARREFOUR SOFT — 500ml</p>
+          </div>
+          <div class="product-price">
+            <div class="price-main" aria-label="Prix : 0 euro 95">0,95€</div>
+            <div class="price-unit">1,90 € / L</div>
+          </div>
+        </div>
+        <div class="product-actions">
+          <button class="btn btn-success" disabled aria-label="Savon Carrefour Soft confirmé">Confirmé</button>
+        </div>
+      </article>
+    </li>
+  </ul>
+
+  <button class="btn btn-primary btn-full btn-lg" style="margin-top:20px;" onclick="showScreen('cart')" aria-label="Ajouter les 5 produits au panier Carrefour, total estimé 8 euros 10">
+    Ajouter tout au panier Carrefour
+  </button>
+
+  <button class="back-link" onclick="showScreen('input')">Nouvelle liste</button>
+</section>
+
+<!-- ═══ ÉCRAN 3: PANIER ═══ -->
+<section id="screen-cart" role="tabpanel" aria-labelledby="tab-cart" aria-hidden="true" class="screen" tabindex="-1">
+  <h1>Votre panier Carrefour</h1>
+
+  <div class="voice-banner" role="status">
+    <strong>Panier rempli.</strong> 5 produits pour 8 euros 10. Premier créneau disponible : dimanche 13 avril de 8h à 10h au Drive Mondelange.
+  </div>
+
+  <div class="cart-box">
+    <h2>Détail de la commande</h2>
+
+    <div class="cart-item"><span>1x Lait Demi-Écrémé LACTEL</span><span>1,26€</span></div>
+    <div class="cart-item"><span>1x Pâtes Spaghetti BARILLA</span><span>1,45€</span></div>
+    <div class="cart-item"><span>1x Yaourts Nature CARREFOUR CLASSIC'</span><span>2,29€</span></div>
+    <div class="cart-item"><span>1x Jambon Le Bon Paris HERTA</span><span>2,15€</span></div>
+    <div class="cart-item"><span>1x Savon Mains CARREFOUR SOFT</span><span>0,95€</span></div>
+
+    <div class="cart-total">
+      <span>Total</span>
+      <span style="color:var(--accent);" aria-label="Total : 8 euros 10">8,10€</span>
+    </div>
+
+    <div class="slot-info">
+      <strong>Premier créneau disponible</strong><br>
+      Dimanche 13 avril 2026, de 08h00 à 10h00<br>
+      Carrefour Drive Mondelange
+    </div>
+
+    <button class="btn btn-success btn-full btn-lg" style="margin-top:18px;">
+      Valider et payer sur Carrefour
+    </button>
+  </div>
+
+  <button class="back-link" onclick="showScreen('input')">Nouvelle liste</button>
+</section>
+
+<script>
+function showScreen(name) {
+  ['input','results','cart'].forEach(s => {
+    const panel = document.getElementById('screen-' + s);
+    const tab = document.getElementById('tab-' + s);
+    const active = s === name;
+    panel.setAttribute('aria-hidden', String(!active));
+    tab.setAttribute('aria-selected', String(active));
+  });
+  // Focus management: move focus to the new panel
+  const panel = document.getElementById('screen-' + name);
+  panel.focus();
+  // Announce screen change
+  const titles = { input: 'Étape 1 : saisie de la liste', results: 'Étape 2 : produits trouvés', cart: 'Étape 3 : panier' };
+  document.getElementById('live-announcer').textContent = titles[name];
+}
+
+function setTheme(theme) {
+  document.body.className = theme === 'dark' ? '' : 'theme-' + theme;
+}
+
+function setFontSize(size) {
+  document.documentElement.style.setProperty('--font-size-base', size);
+}
+</script>
+
+</body>
+</html>
