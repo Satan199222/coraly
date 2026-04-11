@@ -16,7 +16,8 @@ export function useSpeech(): UseSpeechReturn {
   const [transcript, setTranscript] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
 
   const isSupported =
     typeof window !== "undefined" &&
@@ -25,16 +26,16 @@ export function useSpeech(): UseSpeechReturn {
   const startListening = useCallback(() => {
     if (!isSupported) return;
 
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+    const SpeechRecognitionCtor =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognitionCtor();
     recognition.lang = "fr-FR";
     recognition.continuous = true;
     recognition.interimResults = false;
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const results = Array.from(event.results);
-      const text = results.map((r) => r[0].transcript).join(" ");
+    recognition.onresult = (event: any) => {
+      const results = Array.from(event.results) as any[];
+      const text = results.map((r: any) => r[0].transcript).join(" ");
       setTranscript(text);
     };
 
