@@ -79,6 +79,7 @@ export default function Landing() {
   const { speak, cancelSpeech, isSpeaking } = useSpeech({
     rate: SPEECH_RATE_VALUE[prefs.speechRate],
     lang: prefs.speechLocale,
+    premiumVoice: prefs.premiumVoice,
   });
 
   useFocusAnnounce(voiceEnabled, {

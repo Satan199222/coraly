@@ -276,6 +276,26 @@ export function AccessibilityBar({
             <p className="text-xs text-[var(--text-muted)] mt-2">
               Affecte la reconnaissance vocale et la synthèse vocale.
             </p>
+
+            <label className="flex items-center gap-2 mt-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={prefs.premiumVoice}
+                onChange={(e) => update({ premiumVoice: e.target.checked })}
+                className="w-4 h-4 accent-[var(--accent)]"
+                aria-describedby="premium-voice-help"
+              />
+              <span className="font-semibold text-[var(--text)]">
+                ✨ Voix premium (ElevenLabs)
+              </span>
+            </label>
+            <p
+              id="premium-voice-help"
+              className="text-xs text-[var(--text-muted)] mt-1 ml-6"
+            >
+              Voix de synthèse studio en ligne. Désactivez pour utiliser la
+              voix native du navigateur (offline, plus rapide, plus robotique).
+            </p>
           </fieldset>
 
           {/* Allergènes — input libre */}

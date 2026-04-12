@@ -189,6 +189,7 @@ function Home() {
   } = useSpeech({
     rate: SPEECH_RATE_VALUE[prefs.speechRate],
     lang: prefs.speechLocale,
+    premiumVoice: prefs.premiumVoice,
   });
 
   useFocusAnnounce(voiceEnabled, {

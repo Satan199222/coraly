@@ -23,6 +23,11 @@ export interface Preferences {
   diet: DietaryRestriction[];
   defaults: Record<string, string>;
   allergens: string[];
+  /** "Voix premium" ElevenLabs — remplace speechSynthesis natif sur les
+   *  annonces d'étapes et confirmations. Fallback natif si erreur/offline.
+   *  Par défaut true pour donner immédiatement la meilleure expérience ;
+   *  l'utilisateur peut désactiver (économie quota ou connexion lente). */
+  premiumVoice: boolean;
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -31,6 +36,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   diet: [],
   defaults: {},
   allergens: [],
+  premiumVoice: true,
 };
 
 export const SPEECH_RATE_VALUE: Record<SpeechRate, number> = {
