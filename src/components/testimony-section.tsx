@@ -2,7 +2,7 @@ export function TestimonySection() {
   return (
     <section
       className="py-24 lg:py-28"
-      style={{ background: "var(--accent-ink)", color: "var(--bg)" }}
+      style={{ background: "var(--accent-ink)", color: "var(--text-on-ink)" }}
     >
       <div className="max-w-[1200px] mx-auto px-10 grid gap-16 items-center lg:grid-cols-2">
         <div>
@@ -19,10 +19,10 @@ export function TestimonySection() {
             autonomie.
             <Quote close />
           </blockquote>
-          <cite className="block mt-7 not-italic text-base" style={{ color: "rgba(244,238,227,0.75)" }}>
+          <cite className="block mt-7 not-italic text-base" style={{ color: "var(--text-on-ink-muted)" }}>
             <strong
               className="block text-[17px] mb-0.5"
-              style={{ color: "var(--bg)", fontWeight: 700 }}
+              style={{ color: "var(--text-on-ink)", fontWeight: 700 }}
             >
               Marie-Thérèse, 67 ans
             </strong>
@@ -34,7 +34,7 @@ export function TestimonySection() {
           className="aspect-[4/5] rounded-xl flex items-end p-6 text-sm"
           style={{
             background: "linear-gradient(135deg, #2A4F7E 0%, var(--brass) 120%)",
-            color: "var(--bg)",
+            color: "var(--text-on-ink)",
           }}
         >
           📸 Photo authentique — femme 60+ en cuisine

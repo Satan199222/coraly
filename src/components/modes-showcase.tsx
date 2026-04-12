@@ -91,11 +91,11 @@ export function ModesShowcase() {
 
 function ModeCard({ mode }: { mode: Mode }) {
   const bg = mode.featured ? "var(--accent-ink)" : "var(--bg-card)";
-  const color = mode.featured ? "var(--bg)" : "var(--text)";
-  const descColor = mode.featured ? "rgba(244,238,227,0.88)" : "var(--text-soft)";
+  const color = mode.featured ? "var(--text-on-ink)" : "var(--text)";
+  const descColor = mode.featured ? "var(--text-on-ink-muted)" : "var(--text-soft)";
   const idealColor = mode.featured ? "var(--brass)" : "var(--text-muted)";
   const borderColor = mode.featured ? "var(--accent-ink)" : "var(--border)";
-  const idealBorder = mode.featured ? "rgba(244,238,227,0.2)" : "var(--border)";
+  const idealBorder = mode.featured ? "var(--text-on-ink-faint)" : "var(--border)";
   const markBg = mode.featured ? "rgba(181,136,66,0.18)" : "var(--bg-alt)";
 
   return (
@@ -113,7 +113,7 @@ function ModeCard({ mode }: { mode: Mode }) {
         className="absolute top-5 right-5 px-2.5 py-1 rounded border-[1.5px] text-xs font-bold"
         style={{
           fontFamily: "ui-monospace, monospace",
-          borderColor: mode.featured ? "rgba(244,238,227,0.4)" : "var(--border-hi)",
+          borderColor: mode.featured ? "var(--text-on-ink-faint)" : "var(--border-hi)",
           background: mode.featured ? "transparent" : "var(--bg-card)",
           color,
         }}
