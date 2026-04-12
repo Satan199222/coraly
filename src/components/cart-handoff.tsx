@@ -7,6 +7,10 @@ import {
   generateReadableScript,
   type BookmarkletPayload,
 } from "@/lib/bookmarklet/generate";
+import {
+  useExtension,
+  sendListToExtension,
+} from "@/lib/extension/use-extension";
 
 interface CartHandoffProps {
   cart: Cart | null;
@@ -31,6 +35,9 @@ export function CartHandoff({
 }: CartHandoffProps) {
   const [copied, setCopied] = useState(false);
   const [showScript, setShowScript] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendStatus, setSendStatus] = useState<string | null>(null);
+  const extension = useExtension();
 
   if (!cart || cart.items.length === 0) return null;
 
@@ -40,6 +47,28 @@ export function CartHandoff({
     eans: cart.items.map((i) => i.ean),
   };
   const bookmarkletUrl = generateBookmarklet(payload);
+
+  async function handleSendToExtension() {
+    if (!extension.extensionId) return;
+    setSending(true);
+    setSendStatus(null);
+
+    const result = await sendListToExtension(extension.extensionId, {
+      storeRef,
+      basketServiceId,
+      eans: cart!.items.map((i) => i.ean),
+      title: `${cart!.items.length} produit${cart!.items.length > 1 ? "s" : ""} · ${cart!.totalAmount.toFixed(2)}€`,
+    });
+
+    setSending(false);
+    if (result.ok) {
+      setSendStatus(
+        `Liste envoyée à l'extension. Un nouvel onglet Carrefour s'est ouvert — cliquez sur le bouton "Remplir mon panier" en haut de la page.`
+      );
+    } else {
+      setSendStatus(`Erreur : ${result.error || "impossible d'envoyer la liste"}`);
+    }
+  }
 
   const [openedTab, setOpenedTab] = useState(false);
 
@@ -117,15 +146,64 @@ export function CartHandoff({
         )}
       </div>
 
-      {/* Remise du panier — approche bookmarklet.
-          ATTENTION : les navigateurs modernes suppriment le préfixe "javascript:"
-          quand on le colle dans la barre d'adresse. On ne peut donc PAS se
-          contenter de copier/coller — il faut glisser-déposer le lien dans
-          la barre de favoris, ou le sauvegarder comme marque-page. */}
+      {/* Chemin préféré : extension installée */}
+      {extension.installed && (
+        <div className="p-6 rounded-lg bg-[var(--bg-surface)] border-2 border-[var(--success)]">
+          <h3 className="text-lg font-bold mb-3 text-[var(--success)]">
+            ✓ Extension VoixCourses détectée
+          </h3>
+          <p className="mb-4">
+            Envoyez votre liste en un clic — l'extension ouvre Carrefour et
+            vous propose un bouton pour remplir votre panier.
+          </p>
+
+          <button
+            type="button"
+            onClick={handleSendToExtension}
+            disabled={sending}
+            aria-label={`Envoyer ${cart.items.length} produit${cart.items.length > 1 ? "s" : ""} à l'extension VoixCourses pour remplir le panier Carrefour`}
+            className="w-full px-6 py-4 rounded-lg bg-[var(--accent)] text-[var(--bg)] font-bold text-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
+          >
+            {sending
+              ? "Envoi en cours..."
+              : `Envoyer à Carrefour (${cart.items.length} produit${cart.items.length > 1 ? "s" : ""})`}
+          </button>
+
+          {sendStatus && (
+            <p
+              role="status"
+              aria-live="polite"
+              className="mt-4 p-3 rounded bg-[var(--bg)] border border-[var(--border)] text-sm"
+            >
+              {sendStatus}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Chemin fallback : bookmarklet si pas d'extension */}
+      {!extension.installed && (
       <div className="p-6 rounded-lg bg-[var(--bg-surface)] border-2 border-[var(--border)]">
         <h3 className="text-lg font-bold mb-3">
           Ajouter à mon panier Carrefour
         </h3>
+
+        <div className="p-4 rounded bg-[var(--accent)] bg-opacity-10 border border-[var(--accent)] mb-4">
+          <p className="text-sm">
+            <strong>Solution recommandée : installer l'extension VoixCourses</strong>
+            <br />
+            1 clic pour remplir votre panier, 100% accessible au clavier.
+            <br />
+            <a
+              href="https://chrome.google.com/webstore/category/extensions"
+              className="underline text-[var(--accent)]"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Installer l'extension (Chrome Web Store — bientôt disponible)
+            </a>
+          </p>
+        </div>
         <p className="text-[var(--text-muted)] mb-4">
           Votre liste est prête. Pour la transférer dans votre panier
           Carrefour, il faut utiliser un lien spécial qui s'exécute sur
@@ -247,6 +325,7 @@ export function CartHandoff({
           </button>
         </details>
       </div>
+      )}
 
       {/* Fallback liste manuelle */}
       <details className="p-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border)]">

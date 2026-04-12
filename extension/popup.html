@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>VoixCourses</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 16px;
+      width: 300px;
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #f0f0f5;
+    }
+    h1 { font-size: 16px; margin: 0 0 8px 0; color: #4cc9f0; }
+    p { margin: 8px 0; font-size: 14px; line-height: 1.5; }
+    .muted { color: #a0a8b8; }
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #4cc9f0;
+      color: #0f0f1a;
+      border: 0;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    button:focus-visible {
+      outline: 3px solid #ffd166;
+      outline-offset: 2px;
+    }
+    .status {
+      padding: 8px;
+      border-radius: 6px;
+      background: #1a1a2e;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+    a { color: #4cc9f0; }
+  </style>
+</head>
+<body>
+  <h1>VoixCourses</h1>
+  <div id="content">
+    <p class="muted">Chargement...</p>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
