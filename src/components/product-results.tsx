@@ -106,7 +106,10 @@ export const ProductResults = forwardRef<HTMLDivElement, ProductResultsProps>(
             const perUnit = p.perUnitLabel ? `, soit ${p.perUnitLabel}` : "";
             const pkg = p.packaging ? `, ${p.packaging}` : "";
             const nutri = p.nutriscore ? `, Nutriscore ${p.nutriscore}` : "";
-            const productSummary = `${p.title}${pkg}, ${priceVocal}${perUnit}${nutri}`;
+            // Quantité au DÉBUT du résumé pour que l'utilisateur l'entende avant
+            // de décider de confirmer — il ne doit pas confirmer à l'aveugle.
+            const qtyPrefix = item.quantity > 1 ? `Quantité ${item.quantity}, ` : "";
+            const productSummary = `${qtyPrefix}${p.title}${pkg}, ${priceVocal}${perUnit}${nutri}`;
 
             return (
               <li
@@ -148,38 +151,11 @@ export const ProductResults = forwardRef<HTMLDivElement, ProductResultsProps>(
                   aria-labelledby={titleId}
                   className="flex gap-2 flex-wrap items-center"
                 >
-                  <button
-                    ref={(el) => {
-                      if (confirmRefs) confirmRefs.current.set(p.ean, el);
-                    }}
-                    type="button"
-                    onClick={() => onConfirm(p.ean)}
-                    disabled={isConfirmed}
-                    aria-label={
-                      isConfirmed ? "Déjà confirmé" : "Confirmer ce produit"
-                    }
-                    className={`px-4 py-2 rounded font-semibold transition-colors ${
-                      isConfirmed
-                        ? "bg-[var(--success)] text-[var(--bg)]"
-                        : "bg-[var(--bg)] border border-[var(--success)] text-[var(--success)] hover:bg-[var(--success)] hover:text-[var(--bg)]"
-                    }`}
-                  >
-                    {isConfirmed ? "Confirmé" : "Confirmer"}
-                  </button>
-
-                  {!isConfirmed && total > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => onReject(item.query)}
-                      aria-label={`Voir une autre alternative. Actuellement choix ${item.currentIndex + 1} sur ${total}`}
-                      className="px-4 py-2 rounded border border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger)] hover:text-white transition-colors"
-                    >
-                      Autre choix ({item.currentIndex + 1}/{total})
-                    </button>
-                  )}
-
+                  {/* Quantité EN PREMIER : l'utilisateur doit connaître la
+                      quantité proposée AVANT de pouvoir confirmer. Tab tombe
+                      sur −, +, puis Confirmer. */}
                   <div
-                    className="flex items-center gap-1 ml-auto"
+                    className="flex items-center gap-1"
                     role="group"
                     aria-label={`Quantité : ${item.quantity}`}
                   >
@@ -210,6 +186,38 @@ export const ProductResults = forwardRef<HTMLDivElement, ProductResultsProps>(
                       +
                     </button>
                   </div>
+
+                  <button
+                    ref={(el) => {
+                      if (confirmRefs) confirmRefs.current.set(p.ean, el);
+                    }}
+                    type="button"
+                    onClick={() => onConfirm(p.ean)}
+                    disabled={isConfirmed}
+                    aria-label={
+                      isConfirmed
+                        ? "Déjà confirmé"
+                        : `Confirmer ${item.quantity > 1 ? `${item.quantity} fois ` : ""}${p.title}`
+                    }
+                    className={`px-4 py-2 rounded font-semibold transition-colors ${
+                      isConfirmed
+                        ? "bg-[var(--success)] text-[var(--bg)]"
+                        : "bg-[var(--bg)] border border-[var(--success)] text-[var(--success)] hover:bg-[var(--success)] hover:text-[var(--bg)]"
+                    }`}
+                  >
+                    {isConfirmed ? "Confirmé" : "Confirmer"}
+                  </button>
+
+                  {!isConfirmed && total > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => onReject(item.query)}
+                      aria-label={`Voir une autre alternative. Actuellement choix ${item.currentIndex + 1} sur ${total}`}
+                      className="px-4 py-2 rounded border border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger)] hover:text-white transition-colors ml-auto"
+                    >
+                      Autre choix ({item.currentIndex + 1}/{total})
+                    </button>
+                  )}
                 </div>
 
                 {item.quantity > 1 && p.price != null && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { playBeep } from "./beep";
 
 interface UseSpeechOptions {
   /** Multiplicateur appliqué à utterance.rate (ex: 0.75 lent, 0.95 normal, 1.2 rapide) */
@@ -60,6 +61,10 @@ export function useSpeech(options: UseSpeechOptions = {}): UseSpeechReturn {
     // le texte de la précédente, ce qui fait sauter le textarea visuellement.
     setTranscript("");
 
+    // Bip aigu : signal audio "je t'écoute". Indispensable pour un utilisateur
+    // non-voyant qui ne voit pas le bouton changer de couleur.
+    playBeep("start");
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechRecognitionCtor =
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -97,6 +102,8 @@ export function useSpeech(options: UseSpeechOptions = {}): UseSpeechReturn {
     recognitionRef.current?.stop();
     setIsListening(false);
     isListeningRef.current = false;
+    // Bip grave : signal audio "j'ai arrêté d'écouter".
+    playBeep("stop");
   }, []);
 
   const speak = useCallback(

@@ -52,7 +52,21 @@ export function AccessibilityBar({
     if (typeof window === "undefined") return "1.3rem";
     return localStorage.getItem("voixcourses-font-size") || "1.3rem";
   });
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  // Synthèse vocale ON par défaut : VoixCourses s'adresse en priorité à des
+  // utilisateurs non-voyants — il serait absurde de les obliger à l'activer.
+  // Persistée en localStorage pour respecter un éventuel choix explicite OFF.
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem("voixcourses-voice-enabled");
+    return saved === null ? true : saved === "true";
+  });
+
+  // Notifier le parent au 1er mount avec la valeur lue depuis localStorage.
+  useEffect(() => {
+    onVoiceToggle?.(voiceEnabled);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const extension = useExtension();
   const { prefs, update } = usePreferences();
 
@@ -126,8 +140,10 @@ export function AccessibilityBar({
             type="checkbox"
             checked={voiceEnabled}
             onChange={(e) => {
-              setVoiceEnabled(e.target.checked);
-              onVoiceToggle?.(e.target.checked);
+              const next = e.target.checked;
+              setVoiceEnabled(next);
+              localStorage.setItem("voixcourses-voice-enabled", String(next));
+              onVoiceToggle?.(next);
             }}
             className="w-5 h-5 accent-[var(--accent)]"
             aria-describedby="voice-help"
