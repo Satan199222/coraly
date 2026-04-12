@@ -25,6 +25,13 @@ interface UseWelcomeAudioOptions {
  */
 export function useWelcomeAudio({ voiceEnabled, speak }: UseWelcomeAudioOptions) {
   const playedRef = useRef(false);
+  // Ref mis à jour à chaque rendu : le callback du timer peut ainsi vérifier
+  // la valeur courante de voiceEnabled au moment du déclenchement, même si
+  // l'utilisateur a coupé la voix pendant le délai de 600 ms.
+  const voiceRef = useRef(voiceEnabled);
+  useEffect(() => {
+    voiceRef.current = voiceEnabled;
+  });
 
   useEffect(() => {
     if (playedRef.current) return;
@@ -36,11 +43,16 @@ export function useWelcomeAudio({ voiceEnabled, speak }: UseWelcomeAudioOptions)
         playedRef.current = true;
         return;
       }
-    } catch { /* noop */ }
+    } catch (err) {
+      console.warn("[welcome] sessionStorage.getItem failed (private browsing?):", err);
+    }
 
     playedRef.current = true;
 
     const t = setTimeout(() => {
+      // Re-vérifier au moment du déclenchement : l'utilisateur a peut-être
+      // coupé la voix pendant le délai de 600 ms.
+      if (!voiceRef.current) return;
       speak(GREETING)
         .then(() => {
           try {

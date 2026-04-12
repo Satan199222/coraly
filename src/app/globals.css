@@ -35,9 +35,10 @@
   --shadow-md: 0 4px 12px rgba(13, 27, 42, 0.06);
   --shadow-lg: 0 10px 28px rgba(13, 27, 42, 0.08);
 
-  /* Texte sur fond --accent-ink (panneaux foncés) — ne jamais utiliser
-     var(--bg) dans ce contexte : --bg devient sombre dans les thèmes sombre
-     et jaune-noir, rendant le texte invisible sur fond identique. */
+  /* Texte sur fond --accent-ink (panneaux foncés). Toujours utiliser ces tokens
+     plutôt que var(--bg) : --bg est redéfini dans chaque thème et peut devenir
+     sombre (voire identique à --accent-ink), rendant le texte invisible.
+     Chaque thème ci-dessous redéfinit ces trois valeurs en conséquence. */
   --text-on-ink:        #F4EEE3;
   --text-on-ink-muted:  rgba(244, 238, 227, 0.75);
   --text-on-ink-faint:  rgba(244, 238, 227, 0.35);
@@ -56,7 +57,8 @@
 
   --accent:       #B58842;
   --accent-hover: #D4A35A;
-  --accent-ink:   #0D1B2A;
+  /* Distinct de --bg (#0D1B2A) pour que les panneaux restent visibles */
+  --accent-ink:   #1A3A5C;
   --brass:        #D4A35A;
 
   --border:       rgba(244, 238, 227, 0.12);
@@ -84,7 +86,8 @@
 
   --accent:       #FFEB00;
   --accent-hover: #FFFFFF;
-  --accent-ink:   #000000;
+  /* Distinct de --bg (#000000) : fond très sombre mais perceptible */
+  --accent-ink:   #111100;
   --brass:        #FFFFFF;
 
   --border:       #FFEB00;
@@ -112,7 +115,8 @@
 
   --accent:       #FFFFFF;
   --accent-hover: #E5ECFF;
-  --accent-ink:   #003366;
+  /* Distinct de --bg (#003366) : bleu nuit très foncé */
+  --accent-ink:   #001840;
   --brass:        #FFD166;
 
   --border:       rgba(255, 255, 255, 0.25);

@@ -33,8 +33,9 @@ export default function HomePage() {
     try {
       const saved = localStorage.getItem("voixcourses-voice-enabled");
       return saved === null ? true : saved === "true";
-    } catch {
-      return true;
+    } catch (err) {
+      console.warn("[home] localStorage.getItem(voixcourses-voice-enabled) failed:", err);
+      return true; // Défaut : voix activée si localStorage inaccessible
     }
   });
   const [helpOpen, setHelpOpen] = useState(false);
@@ -49,13 +50,49 @@ export default function HomePage() {
 
   useWelcomeAudio({ voiceEnabled, speak });
 
-  const playDemo = useCallback(() => {
-    speak(
+  const playDemo = useCallback(async () => {
+    const text =
       "Bonjour, je suis Koraly. Dites-moi ce dont vous avez besoin. " +
-        "Par exemple : pommes Golden, lait demi-écrémé, pain complet."
-    ).catch((err) => {
-      console.error("[home] playDemo speak failed:", err);
-    });
+      "Par exemple : pommes Golden, lait demi-écrémé, pain complet.";
+
+    // La démo court-circuite useSpeech intentionnellement : on veut toujours
+    // ElevenLabs quelle que soit la préférence premiumVoice de l'utilisateur,
+    // et on isole le cycle de vie audio (pas d'effet sur isSpeaking ni cancelSpeech).
+    if (typeof navigator !== "undefined" && navigator.onLine !== false) {
+      try {
+        const res = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const audio = new Audio(url);
+          const cleanup = () => URL.revokeObjectURL(url);
+          audio.onended = cleanup;
+          audio.onerror = () => {
+            console.warn("[home] playDemo audio.onerror:", audio.error?.code, audio.error?.message);
+            cleanup();
+            speak(text).catch((err) => console.error("[home] playDemo speak fallback failed:", err));
+          };
+          try {
+            await audio.play();
+          } catch (err) {
+            console.warn("[home] playDemo autoplay bloqué:", err);
+            cleanup();
+            speak(text).catch((err2) =>
+              console.error("[home] playDemo speak fallback failed:", err2)
+            );
+          }
+          return;
+        }
+        console.warn("[home] playDemo /api/tts responded", res.status, "— fallback natif");
+      } catch (err) {
+        console.warn("[home] playDemo ElevenLabs failed, fallback natif:", err);
+      }
+    }
+    speak(text).catch((err) => console.error("[home] playDemo speak failed:", err));
   }, [speak]);
 
   useKeyboardShortcuts({
