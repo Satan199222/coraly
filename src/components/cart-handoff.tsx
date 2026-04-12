@@ -117,67 +117,118 @@ export function CartHandoff({
         )}
       </div>
 
-      {/* Instructions bookmarklet */}
+      {/* Remise du panier — approche bookmarklet.
+          ATTENTION : les navigateurs modernes suppriment le préfixe "javascript:"
+          quand on le colle dans la barre d'adresse. On ne peut donc PAS se
+          contenter de copier/coller — il faut glisser-déposer le lien dans
+          la barre de favoris, ou le sauvegarder comme marque-page. */}
       <div className="p-6 rounded-lg bg-[var(--bg-surface)] border-2 border-[var(--border)]">
         <h3 className="text-lg font-bold mb-3">
           Ajouter à mon panier Carrefour
         </h3>
         <p className="text-[var(--text-muted)] mb-4">
-          Votre panier est prêt. Pour le retrouver dans votre session Carrefour
-          personnelle, suivez ces étapes :
+          Votre liste est prête. Pour la transférer dans votre panier
+          Carrefour, il faut utiliser un lien spécial qui s'exécute sur
+          carrefour.fr avec vos cookies.
         </p>
 
-        <ol className="space-y-3 list-decimal list-inside mb-4">
+        <div className="p-4 rounded border border-[var(--danger)] bg-[var(--bg)] mb-4">
+          <p className="text-sm">
+            <strong>Important :</strong> ce lien ne fonctionne PAS en le
+            collant dans la barre d'adresse (les navigateurs le bloquent pour
+            des raisons de sécurité). Vous devez le{" "}
+            <strong>glisser dans votre barre de favoris</strong>, puis le
+            cliquer une fois sur carrefour.fr.
+          </p>
+        </div>
+
+        <h4 className="font-semibold mb-2">Marche à suivre :</h4>
+        <ol className="space-y-2 list-decimal list-inside mb-4 text-sm">
           <li>
-            <strong>Cliquez sur le bouton ci-dessous</strong> — il copie le
-            lien magique ET ouvre carrefour.fr dans un nouvel onglet
+            <strong>Glissez le lien ci-dessous</strong> vers votre barre de
+            favoris (maintenez le clic sur le lien et déplacez-le vers la
+            barre en haut du navigateur)
           </li>
           <li>
-            Dans le nouvel onglet carrefour.fr, appuyez sur{" "}
-            <kbd className="px-2 py-0.5 bg-[var(--bg)] rounded border border-[var(--border)]">
-              Ctrl+L
-            </kbd>{" "}
-            pour placer le curseur dans la barre d'adresse
+            Ouvrez{" "}
+            <a
+              href="https://www.carrefour.fr"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline text-[var(--accent)]"
+            >
+              carrefour.fr
+            </a>{" "}
+            dans un nouvel onglet
           </li>
           <li>
-            Appuyez sur{" "}
-            <kbd className="px-2 py-0.5 bg-[var(--bg)] rounded border border-[var(--border)]">
-              Ctrl+V
-            </kbd>{" "}
-            pour coller le lien magique, puis{" "}
-            <kbd className="px-2 py-0.5 bg-[var(--bg)] rounded border border-[var(--border)]">
-              Entrée
-            </kbd>
-          </li>
-          <li>
-            Le panier se remplit automatiquement, vous arrivez sur la page
-            panier Carrefour
+            Cliquez sur le favori "VoixCourses" que vous venez d'ajouter —
+            le panier se remplit automatiquement
           </li>
         </ol>
 
-        <div className="flex gap-3 flex-wrap">
+        <div className="flex gap-3 flex-wrap items-center mb-4">
+          {/* Lien drag-drop vers la barre de favoris */}
+          <a
+            href={bookmarkletUrl}
+            className="px-6 py-3 rounded-lg bg-[var(--accent)] text-[var(--bg)] font-bold text-lg inline-block cursor-grab active:cursor-grabbing"
+            onClick={(e) => e.preventDefault()}
+            draggable
+            aria-label={`Lien magique VoixCourses pour ${cart.items.length} produit${cart.items.length > 1 ? "s" : ""}. À glisser dans la barre de favoris.`}
+          >
+            ↓ VoixCourses — Glisser dans les favoris
+          </a>
+
           <button
             type="button"
             onClick={handleCopyAndOpen}
-            aria-label={
-              copied && openedTab
-                ? `Lien copié et carrefour.fr ouvert dans un nouvel onglet. Dans l'onglet Carrefour : Ctrl+L puis Ctrl+V puis Entrée pour remplir votre panier.`
-                : copied
-                  ? "Lien copié. Ouvrez carrefour.fr et collez dans la barre d'adresse"
-                  : `Copier le lien magique et ouvrir Carrefour pour ajouter ${cart.items.length} produit${cart.items.length > 1 ? "s" : ""}`
-            }
-            className={`px-6 py-3 rounded-lg font-bold text-lg transition-colors ${
-              copied
-                ? "bg-[var(--success)] text-[var(--bg)]"
-                : "bg-[var(--accent)] text-[var(--bg)] hover:bg-[var(--accent-hover)]"
-            }`}
+            aria-label="Copier le code dans le presse-papiers (utilisation avancée)"
+            className="px-4 py-2 rounded border border-[var(--border)] text-[var(--text-muted)] text-sm hover:border-[var(--accent)] hover:text-[var(--text)] transition-colors"
           >
-            {copied && openedTab
-              ? "✓ Prêt ! Allez dans l'onglet Carrefour → Ctrl+L → Ctrl+V → Entrée"
-              : copied
-                ? "✓ Copié ! Ouvrez carrefour.fr"
-                : "Copier et ouvrir Carrefour"}
+            {copied ? "✓ Copié" : "Copier le code"}
           </button>
+        </div>
+
+        <div className="p-4 rounded bg-[var(--bg)] border border-[var(--border)] text-sm">
+          <p className="font-semibold mb-1">
+            Navigation clavier uniquement ?
+          </p>
+          <p className="text-[var(--text-muted)]">
+            Le glisser-déposer n'est pas accessible au clavier. Dans ce cas :
+          </p>
+          <ol className="list-decimal list-inside mt-2 space-y-1">
+            <li>
+              Appuyez sur{" "}
+              <kbd className="px-1.5 py-0.5 bg-[var(--bg-surface)] rounded border border-[var(--border)] text-xs">
+                Ctrl+D
+              </kbd>{" "}
+              sur le lien "VoixCourses" ci-dessus pour ouvrir la boîte de
+              dialogue "Ajouter un favori"
+            </li>
+            <li>
+              Validez avec{" "}
+              <kbd className="px-1.5 py-0.5 bg-[var(--bg-surface)] rounded border border-[var(--border)] text-xs">
+                Entrée
+              </kbd>
+            </li>
+            <li>
+              Allez sur carrefour.fr, puis{" "}
+              <kbd className="px-1.5 py-0.5 bg-[var(--bg-surface)] rounded border border-[var(--border)] text-xs">
+                Ctrl+Maj+B
+              </kbd>{" "}
+              pour ouvrir la liste des favoris, trouvez "VoixCourses" et{" "}
+              <kbd className="px-1.5 py-0.5 bg-[var(--bg-surface)] rounded border border-[var(--border)] text-xs">
+                Entrée
+              </kbd>{" "}
+              dessus
+            </li>
+          </ol>
+          <p className="mt-2 text-[var(--text-muted)]">
+            <em>
+              Une extension navigateur dédiée arrive bientôt pour simplifier
+              cette étape.
+            </em>
+          </p>
         </div>
 
         <details className="mt-4">
