@@ -99,8 +99,13 @@ export const ProductResults = forwardRef<HTMLDivElement, ProductResultsProps>(
 
             const isConfirmed = confirmedEans.has(p.ean);
             const total = item.allCandidates.length;
+            // N'annonce la position ("Choix X sur Y") que si l'utilisateur a
+            // déjà cliqué "Autre choix" — à l'arrivée, currentIndex=0, et
+            // mentionner "choix 1 sur 5" à chaque card pollue inutilement.
             const altInfo =
-              total > 1 ? ` Choix ${item.currentIndex + 1} sur ${total}.` : "";
+              total > 1 && item.currentIndex > 0
+                ? ` Choix ${item.currentIndex + 1} sur ${total}.`
+                : "";
 
             const priceVocal = priceToSpeech(p.price);
             const perUnit = p.perUnitLabel ? `, soit ${p.perUnitLabel}` : "";
