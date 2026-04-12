@@ -17,47 +17,10 @@ const BANNER_ID = "voixcourses-banner";
  *
  * Prononciation française : prix en "X euros YY centimes", unités étendues.
  */
-const tts = {
-  frenchVoice: null,
-  initialized: false,
+// Utilise l'API partagée chargée par voice-core.js (déclaré avant dans le manifest)
+const { tts } = window.__voixcoursesTTS;
 
-  init() {
-    if (this.initialized) return;
-    this.initialized = true;
-    const pickVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      this.frenchVoice = voices.find((v) => v.lang.startsWith("fr")) || null;
-    };
-    pickVoice();
-    window.speechSynthesis.onvoiceschanged = pickVoice;
-  },
-
-  normalize(text) {
-    return (text || "")
-      .replace(/(\d+)[.,](\d{2})\s*€/g, "$1 euros $2 centimes")
-      .replace(/(\d+)\s*€/g, "$1 euros")
-      .replace(/(\d+(?:[.,]\d+)?)\s*L\b/g, "$1 litres")
-      .replace(/(\d+(?:[.,]\d+)?)\s*kg\b/gi, "$1 kilogrammes")
-      .replace(/(\d+(?:[.,]\d+)?)\s*g\b/g, "$1 grammes")
-      .replace(/(\d+)\s*cl\b/g, "$1 centilitres")
-      .replace(/(\d+)\s*ml\b/g, "$1 millilitres");
-  },
-
-  speak(text) {
-    if (!text || !window.speechSynthesis) return;
-    this.init();
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(this.normalize(text));
-    utterance.lang = "fr-FR";
-    utterance.rate = 1.05;
-    if (this.frenchVoice) utterance.voice = this.frenchVoice;
-    window.speechSynthesis.speak(utterance);
-  },
-
-  cancel() {
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
-  },
-};
+// Les helpers de focus, greeting, toggle sont dans voice-core.js
 
 function getPendingList() {
   return new Promise((resolve) => {
@@ -515,9 +478,17 @@ async function announceCartPage() {
   tts.speak(announcement);
 }
 
-// Au chargement : vérifier si une liste est en attente, ou si on arrive
-// sur la page panier après un remplissage (pour annoncer le résultat).
+// Au chargement de chaque page carrefour.fr :
+// 1. Installer la voix globale au focus (via voice-core.js)
+// 2. Message de bienvenue (1 fois par fenêtre de 30 min)
+// 3. Raccourci V pour réactiver la voix si désactivée
+// 4. Si liste en attente → bannière ; sinon si page panier → annonce
 (async () => {
+  const api = window.__voixcoursesTTS;
+  api.installFocusSpeaker();
+  api.installVoiceToggleShortcut();
+  await api.greetIfNeeded("Carrefour");
+
   const list = await getPendingList();
   if (list) {
     showBanner(list);

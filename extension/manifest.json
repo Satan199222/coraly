@@ -24,7 +24,7 @@
   "content_scripts": [
     {
       "matches": ["https://www.carrefour.fr/*"],
-      "js": ["content.js"],
+      "js": ["voice-core.js", "content.js"],
       "run_at": "document_idle"
     },
     {
@@ -36,6 +36,16 @@
       ],
       "js": ["voixcourses-marker.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://voixcourses.fr/*",
+        "https://*.voixcourses.fr/*",
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*"
+      ],
+      "js": ["voice-core.js", "voixcourses-voice.js"],
+      "run_at": "document_idle"
     }
   ],
 
