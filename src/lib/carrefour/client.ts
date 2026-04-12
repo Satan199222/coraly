@@ -1,4 +1,8 @@
-import { scrapflyFetch, scrapflyFetchHtml, sessionForStore } from "./scrapfly";
+import {
+  zenrowsFetch as scrapflyFetch,
+  zenrowsFetchHtml as scrapflyFetchHtml,
+  sessionForStore,
+} from "./zenrows";
 import {
   SearchResponseSchema,
   GeolocResponseSchema,
