@@ -8,6 +8,36 @@
 const STORAGE_KEY = "voixcourses-pending-list";
 
 /**
+ * Met à jour le badge sur l'icône de l'extension.
+ * - Vide = aucune liste en attente
+ * - Nombre = nombre de produits en attente de transfert
+ */
+function updateBadge(list) {
+  if (list && Array.isArray(list.eans) && list.eans.length > 0) {
+    chrome.action.setBadgeText({ text: String(list.eans.length) });
+    chrome.action.setBadgeBackgroundColor({ color: "#4cc9f0" });
+    chrome.action.setTitle({
+      title: `VoixCourses — ${list.eans.length} produit${list.eans.length > 1 ? "s" : ""} en attente. Cliquez pour ouvrir Carrefour.`,
+    });
+  } else {
+    chrome.action.setBadgeText({ text: "" });
+    chrome.action.setTitle({ title: "VoixCourses — aucune liste en attente" });
+  }
+}
+
+// Initialiser le badge au démarrage
+chrome.storage.local.get([STORAGE_KEY], (result) => {
+  updateBadge(result[STORAGE_KEY]);
+});
+
+// Mettre à jour le badge quand la liste change
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes[STORAGE_KEY]) {
+    updateBadge(changes[STORAGE_KEY].newValue);
+  }
+});
+
+/**
  * Écoute les messages venant de voixcourses.fr.
  * Messages acceptés :
  * - { type: "PING" } → répond { installed: true, version }
