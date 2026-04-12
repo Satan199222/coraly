@@ -1,155 +1,165 @@
 @import "tailwindcss";
 
-/* Force Tailwind v4 to scan our source files for class names.
-   Without this, Turbopack + Tailwind v4 may not auto-detect .tsx classes. */
 @source "../**/*.{ts,tsx}";
 
-/* Thème sombre — défaut, contraste AAA (7:1+) */
+/* =============================================================
+   VOIXCOURSES — DESIGN SYSTEM "MARINE ÉDITORIAL"
+   Réf : docs/superpowers/specs/2026-04-12-voixcourses-design.md
+   ============================================================= */
+
+/* -- Thème Clair (défaut) ----------------------------------- */
 :root {
-  --bg: #0f0f1a;
-  --bg-surface: #1a1a2e;
-  --text: #f0f0f5;
-  --text-muted: #a0a8b8;
-  --accent: #4cc9f0;
-  --accent-hover: #7ae0ff;
-  --danger: #ff6b8a;
-  --success: #2ee8a5;
-  --border: #2b3a55;
-  --focus-ring: #ffd166;
-  --font-size-base: 1.3rem;
-  --shadow-lg: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.35);
+  --bg:           #F4EEE3;
+  --bg-alt:       #ECE2D1;
+  --bg-surface:   #FFFFFF;
+  --bg-card:      #FFFFFF;
+
+  --text:         #0D1B2A;
+  --text-soft:    #3A4A5C;
+  --text-muted:   #5E6E78;
+
+  --accent:       #1E3A5F;
+  --accent-hover: #0D1B2A;
+  --accent-ink:   #0D1B2A;
+  --brass:        #B58842;
+
+  --border:       rgba(13, 27, 42, 0.10);
+  --border-hi:    rgba(13, 27, 42, 0.20);
+
+  --danger:       #B02232;
+  --success:      #1C6E47;
+  --focus-ring:   #FFD166;
+
+  --font-size-base: 18px;
+  --shadow-sm: 0 1px 2px rgba(13, 27, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(13, 27, 42, 0.06);
+  --shadow-lg: 0 10px 28px rgba(13, 27, 42, 0.08);
 }
 
-/* Thème clair — fond blanc, contraste AAA */
-:root.theme-light, body.theme-light {
-  --bg: #ffffff;
-  --bg-surface: #f5f5f7;
-  --text: #1a1a2e;
-  --text-muted: #555566;
-  --accent: #0062cc;
-  --accent-hover: #004fa3;
-  --danger: #c41640;
-  --success: #0a7a52;
-  --border: #ccccdd;
-  --focus-ring: #e67700;
+/* -- Thème Sombre ------------------------------------------- */
+:root.theme-sombre, body.theme-sombre {
+  --bg:           #0D1B2A;
+  --bg-alt:       #14263A;
+  --bg-surface:   #1A2E42;
+  --bg-card:      #14263A;
+
+  --text:         #F4EEE3;
+  --text-soft:    #CCD5DF;
+  --text-muted:   #8FA0B1;
+
+  --accent:       #B58842;
+  --accent-hover: #D4A35A;
+  --accent-ink:   #0D1B2A;
+  --brass:        #D4A35A;
+
+  --border:       rgba(244, 238, 227, 0.12);
+  --border-hi:    rgba(244, 238, 227, 0.22);
+
+  --danger:       #FF6B8A;
+  --success:      #2EE8A5;
+  --focus-ring:   #FFD166;
 }
 
-/* Thème contraste élevé — jaune sur noir.
-   Pattern préféré par les utilisateurs avec DMLA (dégénérescence maculaire) :
-   meilleur ratio de luminance que blanc/noir, moins de glare que pur blanc. */
-:root.theme-high-contrast, body.theme-high-contrast {
-  --bg: #000000;
-  --bg-surface: #0a0a0a;
-  --text: #ffff00;
-  --text-muted: #cccc00;
-  --accent: #ffffff;
-  --accent-hover: #ffff66;
-  --danger: #ff6666;
-  --success: #66ff66;
-  --border: #ffff00;
-  --focus-ring: #ffffff;
+/* -- Thème Jaune/Noir (DMLA) -------------------------------- */
+:root.theme-jaune-noir, body.theme-jaune-noir {
+  --bg:           #000000;
+  --bg-alt:       #0A0A0A;
+  --bg-surface:   #0A0A0A;
+  --bg-card:      #0A0A0A;
+
+  --text:         #FFEB00;
+  --text-soft:    #FFEB00;
+  --text-muted:   #CCBB00;
+
+  --accent:       #FFEB00;
+  --accent-hover: #FFFFFF;
+  --accent-ink:   #000000;
+  --brass:        #FFFFFF;
+
+  --border:       #FFEB00;
+  --border-hi:    #FFFFFF;
+
+  --danger:       #FF6666;
+  --success:      #66FF66;
+  --focus-ring:   #FFFFFF;
 }
 
-* {
-  box-sizing: border-box;
+/* -- Thème Blanc/Bleu (Glaucome) ---------------------------- */
+:root.theme-blanc-bleu, body.theme-blanc-bleu {
+  --bg:           #003366;
+  --bg-alt:       #002244;
+  --bg-surface:   #002A55;
+  --bg-card:      #002A55;
+
+  --text:         #FFFFFF;
+  --text-soft:    #E5ECFF;
+  --text-muted:   #AABBDD;
+
+  --accent:       #FFFFFF;
+  --accent-hover: #E5ECFF;
+  --accent-ink:   #003366;
+  --brass:        #FFD166;
+
+  --border:       rgba(255, 255, 255, 0.25);
+  --border-hi:    rgba(255, 255, 255, 0.45);
+
+  --danger:       #FFB4C1;
+  --success:      #A5E8C6;
+  --focus-ring:   #FFD166;
 }
 
-html {
-  font-size: var(--font-size-base);
+/* -- Forced colors (Windows High Contrast) ------------------ */
+@media (forced-colors: active) {
+  :root {
+    --bg: Canvas;
+    --bg-alt: Canvas;
+    --bg-surface: Canvas;
+    --bg-card: Canvas;
+    --text: CanvasText;
+    --text-soft: CanvasText;
+    --text-muted: CanvasText;
+    --accent: LinkText;
+    --accent-hover: LinkText;
+    --accent-ink: Canvas;
+    --border: CanvasText;
+    --focus-ring: Highlight;
+  }
+  button, [role="button"], input, textarea, select {
+    border: 2px solid ButtonBorder !important;
+  }
 }
+
+/* -- Reset ---------------------------------------------------- */
+* { box-sizing: border-box; }
+
+html { font-size: var(--font-size-base); }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, sans-serif;
-  line-height: 1.6;
+  font-family: var(--font-luciole), system-ui, -apple-system, sans-serif;
+  line-height: 1.65;
+  letter-spacing: 0.005em;
   transition: background 0.2s, color 0.2s;
   min-height: 100vh;
-  background-image:
-    radial-gradient(ellipse at top left, color-mix(in oklab, var(--accent) 6%, transparent), transparent 60%),
-    radial-gradient(ellipse at bottom right, color-mix(in oklab, var(--accent) 4%, transparent), transparent 55%);
 }
 
-/* Dégradé décoratif retiré si l'utilisateur demande high-contrast ou reduced-motion */
-@media (prefers-contrast: more) {
-  body { background-image: none; }
-}
-:root.theme-high-contrast body { background-image: none; }
-
-/* Focus visible AAA — ring épais + outline solide en doublon.
-   Le double effet garantit la visibilité même si un des deux est supprimé
-   par un reset CSS tiers ou un thème browser particulier.
-   4px minimum recommandé par WCAG 2.2 § 2.4.11 (Focus Appearance). */
+/* -- Focus visible AAA -------------------------------------- */
 :focus-visible {
-  outline: 4px solid var(--focus-ring);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 3px;
-  border-radius: 2px;
+  border-radius: 4px;
 }
-
-/* Cibles utilisateur avec troubles cognitifs ou motricité réduite qui
-   utilisent un pointeur : le focus doit aussi être très visible au hover/focus
-   simultané. */
 @media (prefers-contrast: more) {
-  :root {
-    --bg: #000000;
-    --bg-surface: #0a0a0a;
-    --text: #ffffff;
-    --text-muted: #dddddd;
-    --accent: #ffff00;
-    --accent-hover: #ffff66;
-    --border: #ffffff;
-    --focus-ring: #ffff00;
-  }
-
-  :focus-visible {
-    outline-width: 6px;
-    outline-offset: 4px;
-  }
+  :focus-visible { outline-width: 5px; outline-offset: 4px; }
 }
 
-::selection {
-  background: var(--accent);
-  color: var(--bg);
-}
+/* -- Selection --------------------------------------------- */
+::selection { background: var(--accent); color: var(--bg); }
 
-/* Windows High Contrast Mode — utiliser les system colors plutôt que les nôtres. */
-@media (forced-colors: active) {
-  :root {
-    --bg: Canvas;
-    --bg-surface: Canvas;
-    --text: CanvasText;
-    --text-muted: CanvasText;
-    --accent: LinkText;
-    --accent-hover: LinkText;
-    --border: CanvasText;
-    --focus-ring: Highlight;
-    --danger: Mark;
-    --success: LinkText;
-  }
-
-  /* Forcer les bordures sur les éléments avec background coloré qui disparaissent
-     en forced-colors (le background est ignoré, on doit garantir la visibilité) */
-  button,
-  [role="button"],
-  input,
-  textarea,
-  select {
-    border: 2px solid ButtonBorder !important;
-  }
-
-  :focus-visible {
-    outline: 4px solid Highlight;
-    outline-offset: 2px;
-  }
-}
-
-/* Respecter prefers-reduced-motion — utilisateurs avec vertiges, TDAH,
-   ou simplement qui n'aiment pas les animations. */
+/* -- Reduced motion ---------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -157,36 +167,59 @@ body {
   }
 }
 
-/* Transitions subtiles — apparition pour accompagner les changements.
-   Respecte prefers-reduced-motion. */
-@keyframes voixcourses-fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.step-fade {
-  animation: voixcourses-fade-in 240ms ease-out both;
+/* -- Typographie de base (échelle stricte) ------------------ */
+.vc-h1 { font-size: 64px; line-height: 1.02; letter-spacing: -2px; font-weight: 700; }
+.vc-h2 { font-size: 40px; line-height: 1.1; letter-spacing: -1.2px; font-weight: 700; }
+.vc-h3 { font-size: 22px; line-height: 1.25; letter-spacing: -0.2px; font-weight: 700; }
+.vc-body { font-size: 18px; line-height: 1.65; }
+.vc-meta { font-size: 15px; line-height: 1.55; }
+.vc-micro {
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 700;
 }
 
-/* Animations pour l'orb de conversation */
-@keyframes breathe {
+@media (max-width: 768px) {
+  .vc-h1 { font-size: 44px; letter-spacing: -1.2px; }
+  .vc-h2 { font-size: 30px; letter-spacing: -0.8px; }
+  .vc-h3 { font-size: 20px; }
+}
+
+/* -- Eyebrow éditorial -------------------------------------- */
+.vc-eyebrow {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.vc-eyebrow::before {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: var(--brass);
+}
+
+/* -- Orb animations ---------------------------------------- */
+@keyframes vc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes vc-ripple {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+@keyframes vc-breathe {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
-@keyframes pingSlow {
-  0% { transform: scale(1); opacity: 0.5; }
-  100% { transform: scale(1.6); opacity: 0; }
+  50% { transform: scale(1.04); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .step-fade,
-  [class*="animate-"] { animation: none !important; }
-}
-
-/* sr-only utility (Tailwind v4) */
+/* -- sr-only ------------------------------------------------ */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -199,9 +232,8 @@ body {
   border: 0;
 }
 
-/* Placeholder visible (contrast accessible) — par défaut les placeholders
-   sont rendus en gris clair qui peut tomber sous 3:1 dans certains thèmes. */
+/* -- Placeholder ------------------------------------------- */
 ::placeholder {
   color: var(--text-muted);
-  opacity: 1; /* Firefox baisse à 0.5 par défaut */
+  opacity: 1;
 }
