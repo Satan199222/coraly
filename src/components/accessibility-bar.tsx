@@ -177,7 +177,8 @@ export function AccessibilityBar({
 
         <div className="shrink-0 mx-2 w-px h-8" style={{ background: "var(--text-on-ink-faint)" }} aria-hidden="true" />
 
-        {/* — 4 thèmes — chaque bouton porte visuellement son thème — */}
+        {/* — 4 thèmes — chaque bouton porte visuellement son thème —
+            suppressHydrationWarning : l'outline active dépend du thème lu depuis localStorage. */}
         {THEME_OPTIONS.map((opt) => {
           const active = theme === opt.value;
           return (
@@ -187,6 +188,7 @@ export function AccessibilityBar({
               aria-label={opt.aria}
               aria-pressed={active}
               onClick={() => setTheme(opt.value)}
+              suppressHydrationWarning
               className="shrink-0 rounded-lg font-bold transition-all"
               style={{
                 height: 52,
@@ -206,6 +208,8 @@ export function AccessibilityBar({
         <div className="shrink-0 mx-2 w-px h-8" style={{ background: "var(--text-on-ink-faint)" }} aria-hidden="true" />
 
         {/* — Voix — */}
+        {/* suppressHydrationWarning : le texte "active"/"coupée" dépend de localStorage,
+            qui n'est pas accessible côté serveur → mismatch SSR/client intentionnel. */}
         <button
           type="button"
           aria-pressed={voiceEnabled}
@@ -215,6 +219,7 @@ export function AccessibilityBar({
             safeLocalSet("voixcourses-voice-enabled", String(next));
             onVoiceToggle?.(next);
           }}
+          suppressHydrationWarning
           className="shrink-0 rounded-lg border-2 font-bold transition-all"
           style={{
             height: 52, padding: "0 18px", fontSize: 15, whiteSpace: "nowrap",

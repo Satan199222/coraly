@@ -25,19 +25,11 @@ export default function HomePage() {
   useDocumentTitle("VoixCourses — Vos courses par la voix");
 
   const router = useRouter();
-  // Lire la préférence voix depuis localStorage dès le premier rendu pour que
-  // useWelcomeAudio ne démarre jamais avec voiceEnabled=true si l'utilisateur
-  // avait coupé la voix lors d'une session précédente.
-  const [voiceEnabled, setVoiceEnabled] = useState(() => {
-    if (typeof window === "undefined") return true;
-    try {
-      const saved = localStorage.getItem("voixcourses-voice-enabled");
-      return saved === null ? true : saved === "true";
-    } catch (err) {
-      console.warn("[home] localStorage.getItem(voixcourses-voice-enabled) failed:", err);
-      return true; // Défaut : voix activée si localStorage inaccessible
-    }
-  });
+  // Démarre toujours à true côté serveur pour cohérence SSR/client.
+  // AccessibilityBar notifie le parent via onVoiceToggle au premier mount
+  // avec la vraie valeur localStorage → useWelcomeAudio reçoit la bonne valeur
+  // avant de tenter de parler (délai 600 ms dans useWelcomeAudio).
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [helpOpen, setHelpOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const { prefs } = usePreferences();
