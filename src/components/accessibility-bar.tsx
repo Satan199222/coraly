@@ -7,21 +7,30 @@ interface AccessibilityBarProps {
 }
 
 export function AccessibilityBar({ onVoiceToggle }: AccessibilityBarProps = {}) {
-  const [theme, setTheme] = useState("dark");
-  const [fontSize, setFontSize] = useState("1.125rem");
+  // Lire les préférences depuis localStorage au mount
+  const [theme, setTheme] = useState<string>(() => {
+    if (typeof window === "undefined") return "dark";
+    return localStorage.getItem("voixcourses-theme") || "dark";
+  });
+  const [fontSize, setFontSize] = useState<string>(() => {
+    if (typeof window === "undefined") return "1.125rem";
+    return localStorage.getItem("voixcourses-font-size") || "1.125rem";
+  });
   const [voiceEnabled, setVoiceEnabled] = useState(false);
 
   useEffect(() => {
-    // Retirer les anciennes classes de thème, garder les autres
-    document.body.classList.remove("theme-light", "theme-high-contrast");
+    // Le thème est appliqué sur <html> (par theme-init.ts au boot, et ici sur changement)
+    const root = document.documentElement;
+    root.classList.remove("theme-light", "theme-high-contrast");
     if (theme !== "dark") {
-      document.body.classList.add(`theme-${theme}`);
+      root.classList.add(`theme-${theme}`);
     }
+    localStorage.setItem("voixcourses-theme", theme);
   }, [theme]);
 
   useEffect(() => {
-    // La variable CSS --font-size-base est sur :root (html), pas body
     document.documentElement.style.setProperty("--font-size-base", fontSize);
+    localStorage.setItem("voixcourses-font-size", fontSize);
   }, [fontSize]);
 
   return (

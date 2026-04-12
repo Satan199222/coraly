@@ -16,7 +16,7 @@
 }
 
 /* Thème clair — fond blanc, contraste AAA */
-body.theme-light {
+:root.theme-light, body.theme-light {
   --bg: #ffffff;
   --bg-surface: #f5f5f7;
   --text: #1a1a2e;
@@ -29,18 +29,21 @@ body.theme-light {
   --focus-ring: #e67700;
 }
 
-/* Thème contraste élevé — noir/jaune (max accessibilité) */
-body.theme-high-contrast {
+/* Thème contraste élevé — jaune sur noir.
+   Pattern préféré par les utilisateurs avec DMLA (dégénérescence maculaire) :
+   meilleur ratio de luminance que blanc/noir, moins de glare que pur blanc.
+   Réf : Smashing Magazine "Inclusive Dark Mode" 2025. */
+:root.theme-high-contrast, body.theme-high-contrast {
   --bg: #000000;
-  --bg-surface: #1a1a1a;
-  --text: #ffffff;
-  --text-muted: #cccccc;
-  --accent: #ffff00;
+  --bg-surface: #0a0a0a;
+  --text: #ffff00;       /* jaune vif sur noir — contraste maximum perçu */
+  --text-muted: #cccc00;
+  --accent: #ffffff;     /* CTA en blanc sur noir */
   --accent-hover: #ffff66;
-  --danger: #ff4444;
-  --success: #44ff44;
-  --border: #ffffff;
-  --focus-ring: #ffff00;
+  --danger: #ff6666;
+  --success: #66ff66;
+  --border: #ffff00;
+  --focus-ring: #ffffff;
 }
 
 * {
