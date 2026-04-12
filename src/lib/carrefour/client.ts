@@ -1,4 +1,4 @@
-import { browserFetch, getPage } from "./browser";
+import { scrapflyFetch, scrapflyFetchHtml, sessionForStore } from "./scrapfly";
 import {
   SearchResponseSchema,
   GeolocResponseSchema,
@@ -18,11 +18,6 @@ import type {
   CartItem,
 } from "./types";
 
-/**
- * Extrait un CarrefourProduct depuis la réponse JSON:API validée.
- * Les offers sont indexées par EAN — on prend la première entrée qui a
- * des attributs (il y en a généralement 1 seule par produit/magasin).
- */
 function extractProduct(raw: ProductRaw): CarrefourProduct {
   const a = raw.attributes;
   const ean = a.ean;
@@ -83,10 +78,19 @@ function extractStore(raw: StoreRaw): CarrefourStore {
   };
 }
 
-/** Recherche produits. Ref: GET /s?q={query} */
-export async function searchProducts(query: string): Promise<SearchResult> {
+/**
+ * Recherche produits. Ref: GET /s?q={query}
+ * `storeRef` optionnel : si fourni, utilise la session ScrapFly du magasin
+ * pour que les prix/dispo reflètent le stock local.
+ */
+export async function searchProducts(
+  query: string,
+  storeRef?: string
+): Promise<SearchResult> {
   const params = new URLSearchParams({ q: query });
-  const raw = await browserFetch<unknown>(`/s?${params}`);
+  const raw = await scrapflyFetch<unknown>(`/s?${params}`, {
+    session: storeRef ? sessionForStore(storeRef) : undefined,
+  });
   const parsed = safeParse(SearchResponseSchema, raw, "search");
   if (!parsed) {
     return { products: [], total: 0, keyword: query };
@@ -115,40 +119,41 @@ export async function findStores(
   params.append("modes[]", "delivery");
   params.append("modes[]", "picking");
 
-  const raw = await browserFetch<unknown>(`/geoloc?${params}`);
+  const raw = await scrapflyFetch<unknown>(`/geoloc?${params}`);
   const parsed = safeParse(GeolocResponseSchema, raw, "geoloc");
   if (!parsed) return [];
   return (parsed.data?.stores ?? []).map(extractStore);
 }
 
-/** Sélectionner un magasin. Ref: GET /set-store/{ref} */
+/** Sélectionner un magasin. Ref: GET /set-store/{ref}
+ *  On passe par la session du magasin pour que le cookie persiste sur les
+ *  appels suivants (search, cart, slots). */
 export async function setStore(storeRef: string): Promise<void> {
-  await browserFetch<unknown>(`/set-store/${storeRef}`);
+  await scrapflyFetch<unknown>(`/set-store/${storeRef}`, {
+    session: sessionForStore(storeRef),
+  });
 }
 
 /**
- * Extraire le basketServiceId depuis une fiche produit.
- * Format: XXXX-NNN-{storeRef}. Ref: docs/CARREFOUR-API.md § "Identifiants"
+ * Extraire le basketServiceId depuis une fiche produit (HTML).
+ * Pattern: XXXX-NNN-{storeRef}. Ref: docs/CARREFOUR-API.md § "Identifiants"
  */
 export async function getBasketServiceId(
   storeRef: string
 ): Promise<string | null> {
-  const p = await getPage();
-  await p.goto(
-    "https://www.carrefour.fr/p/lait-demi-ecreme-uht-vitamine-d-lactel-3252210390014",
-    { waitUntil: "domcontentloaded", timeout: 30000 }
+  const html = await scrapflyFetchHtml(
+    "/p/lait-demi-ecreme-uht-vitamine-d-lactel-3252210390014",
+    { session: sessionForStore(storeRef) }
   );
-  await p.waitForTimeout(2000);
-  return p.evaluate((ref: string) => {
-    const html = document.documentElement.innerHTML;
-    const pattern = new RegExp(`[A-Z0-9]{4}-\\d{3}-${ref}`, "g");
-    return html.match(pattern)?.[0] || null;
-  }, storeRef);
+  const pattern = new RegExp(`[A-Z0-9]{4}-\\d{3}-${storeRef}`, "g");
+  return html.match(pattern)?.[0] || null;
 }
 
 /** Lire le panier. Ref: GET /api/cart */
-export async function getCart(): Promise<Cart> {
-  const raw = await browserFetch<unknown>("/api/cart");
+export async function getCart(storeRef?: string): Promise<Cart> {
+  const raw = await scrapflyFetch<unknown>("/api/cart", {
+    session: storeRef ? sessionForStore(storeRef) : undefined,
+  });
   const parsed = safeParse(CartRawSchema, raw, "cart");
   if (!parsed) return { totalAmount: 0, totalFees: 0, items: [] };
   return parseCartResponse(parsed);
@@ -157,11 +162,16 @@ export async function getCart(): Promise<Cart> {
 /**
  * Ajouter un produit au panier.
  * Ref: PATCH /api/cart — docs/CARREFOUR-API.md § "Panier — Ajout"
+ *
+ * Note : dans le flow VoixCourses, c'est l'extension Chrome qui appelle
+ * cet endpoint directement sur carrefour.fr (avec les cookies utilisateur).
+ * Cette fonction n'est utilisée qu'en dev/test.
  */
 export async function addToCart(
   ean: string,
   basketServiceId: string,
-  quantity: number = 1
+  quantity: number = 1,
+  storeRef?: string
 ): Promise<Cart> {
   const body = JSON.stringify({
     trackingRequest: { pageType: "search", pageId: "search" },
@@ -174,10 +184,11 @@ export async function addToCart(
       },
     ],
   });
-  const raw = await browserFetch<unknown>("/api/cart", {
+  const raw = await scrapflyFetch<unknown>("/api/cart", {
     method: "PATCH",
     body,
     headers: { "content-type": "application/json" },
+    session: storeRef ? sessionForStore(storeRef) : undefined,
   });
   const parsed = safeParse(CartRawSchema, raw, "cart:patch");
   if (!parsed) return { totalAmount: 0, totalFees: 0, items: [] };
@@ -188,16 +199,13 @@ export async function addToCart(
 export async function getFirstSlot(
   storeRef: string
 ): Promise<DeliverySlot | null> {
-  const raw = await browserFetch<unknown>(
-    `/api/firstslot?storeId=${storeRef}`
+  const raw = await scrapflyFetch<unknown>(
+    `/api/firstslot?storeId=${storeRef}`,
+    { session: sessionForStore(storeRef) }
   );
   const parsed = safeParse(SlotResponseSchema, raw, "slot");
-  // Réponse [] = pas de créneau dispo
   if (!parsed || Array.isArray(parsed)) return null;
   const attrs = parsed.data?.attributes;
   if (!attrs) return null;
-  return {
-    begDate: attrs.begDate,
-    endDate: attrs.endDate,
-  };
+  return { begDate: attrs.begDate, endDate: attrs.endDate };
 }
