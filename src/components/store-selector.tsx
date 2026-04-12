@@ -13,6 +13,25 @@ export function StoreSelector({ onStoreSelected }: StoreSelectorProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectingRef, setSelectingRef] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [postalError, setPostalError] = useState<string | null>(null);
+
+  function validatePostalCode(value: string): string | null {
+    if (!value.trim()) return null;
+    if (!/^\d{5}$/.test(value.trim())) {
+      return "Le code postal doit contenir exactement 5 chiffres";
+    }
+    return null;
+  }
+
+  function handlePostalBlur() {
+    setPostalError(validatePostalCode(postalCode));
+  }
+
+  function handlePostalChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setPostalCode(e.target.value);
+    // Effacer l'erreur dès que l'utilisateur recommence à taper
+    if (postalError) setPostalError(null);
+  }
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -62,28 +81,47 @@ export function StoreSelector({ onStoreSelected }: StoreSelectorProps) {
         Entrez votre code postal pour trouver les magasins Carrefour proches.
       </p>
 
-      <form onSubmit={handleSearch} className="flex gap-3 mb-6">
-        <label htmlFor="postal-code" className="sr-only">
-          Code postal
-        </label>
-        <input
-          id="postal-code"
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]{5}"
-          value={postalCode}
-          onChange={(e) => setPostalCode(e.target.value)}
-          placeholder="Code postal (ex: 57360)"
-          className="flex-1 p-3 rounded-lg bg-[var(--bg-surface)] border-2 border-[var(--border)] text-[var(--text)] text-lg"
-          autoComplete="postal-code"
-        />
-        <button
-          type="submit"
-          disabled={isLoading || postalCode.length < 5}
-          className="px-6 py-3 rounded-lg bg-[var(--accent)] text-[var(--bg)] font-bold disabled:opacity-50"
-        >
-          {isLoading ? "Recherche..." : "Chercher"}
-        </button>
+      <form onSubmit={handleSearch} className="mb-6">
+        <div className="flex gap-3 mb-2">
+          <label htmlFor="postal-code" className="sr-only">
+            Code postal
+          </label>
+          <input
+            id="postal-code"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]{5}"
+            maxLength={5}
+            value={postalCode}
+            onChange={handlePostalChange}
+            onBlur={handlePostalBlur}
+            placeholder="Code postal (ex: 57360)"
+            className={`flex-1 p-3 rounded-lg bg-[var(--bg-surface)] border-2 text-[var(--text)] text-lg ${
+              postalError
+                ? "border-[var(--danger)]"
+                : "border-[var(--border)]"
+            }`}
+            autoComplete="postal-code"
+            aria-invalid={postalError ? "true" : "false"}
+            aria-describedby={postalError ? "postal-error" : undefined}
+          />
+          <button
+            type="submit"
+            disabled={isLoading || postalCode.length < 5 || !!postalError}
+            className="px-6 py-3 rounded-lg bg-[var(--accent)] text-[var(--bg)] font-bold disabled:opacity-50"
+          >
+            {isLoading ? "Recherche..." : "Chercher"}
+          </button>
+        </div>
+        {postalError && (
+          <p
+            id="postal-error"
+            role="alert"
+            className="text-[var(--danger)] text-sm"
+          >
+            {postalError}
+          </p>
+        )}
       </form>
 
       {error && (
@@ -108,6 +146,7 @@ export function StoreSelector({ onStoreSelected }: StoreSelectorProps) {
                   type="button"
                   onClick={() => handleSelect(store)}
                   disabled={selectingRef !== null}
+                  aria-pressed={selectingRef === store.ref}
                   aria-label={`Choisir ${store.name}, ${store.format}, à ${store.distance} kilomètres`}
                   className="w-full flex items-center justify-between gap-4 p-4 rounded-lg border-2 border-[var(--border)] bg-[var(--bg-surface)] text-left hover:border-[var(--accent)] disabled:opacity-50 transition-colors"
                 >

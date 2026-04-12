@@ -29,7 +29,7 @@ export function ProductResults({
         Produits trouvés ({items.length})
       </h2>
       <ul className="space-y-4">
-        {items.map((item) => {
+        {items.map((item, index) => {
           const p = item.product;
           if (!p) {
             return (
@@ -58,14 +58,19 @@ export function ProductResults({
           const isConfirmed = confirmedEans.has(p.ean);
 
           // Description vocale complète du produit pour les aria-labels des boutons.
-          // Chaque bouton inclut le nom + prix + état pour que le screen reader
-          // annonce l'info produit ET l'action sur chaque focus.
+          // Chaque bouton inclut nom + format + grammage + prix + prix/unité + état
+          // pour que le screen reader annonce TOUT le contexte produit sur chaque focus.
           // Pattern recommandé : pas de tabIndex sur la carte, infos dans les boutons.
           const priceVocal = p.price != null
-            ? p.price.toFixed(2).replace(".", " euro ").replace(",", " euro ")
+            ? `${p.price.toFixed(2).replace(".", " euros ")}`
             : "prix indisponible";
+          const formatVocal = p.format ? `, format ${p.format}` : "";
+          const packagingVocal = p.packaging ? `, ${p.packaging}` : "";
+          const perUnitVocal = p.perUnitLabel ? `, soit ${p.perUnitLabel}` : "";
           const nutriVocal = p.nutriscore ? `, Nutriscore ${p.nutriscore}` : "";
-          const productDesc = `${p.title}, ${p.packaging || ""}, ${priceVocal}${nutriVocal}`;
+          // Article N sur Total — aide la navigation par liste pour les screen readers
+          const positionVocal = `Article ${index + 1} sur ${items.length}. `;
+          const productDesc = `${positionVocal}${p.title}${formatVocal}${packagingVocal}, ${priceVocal}${perUnitVocal}${nutriVocal}`;
 
           return (
             <li
@@ -97,15 +102,18 @@ export function ProductResults({
                 </div>
               </div>
 
-              {/* Boutons d'action — chaque bouton porte la description complète du produit */}
+              {/* Boutons d'action — chaque bouton porte la description complète du produit.
+                  Le 1er bouton (Confirmer) inclut le contexte complet (article N/total + détails).
+                  Les boutons suivants utilisent une description courte (juste nom+prix) pour
+                  éviter la verbosité — l'utilisateur a déjà entendu le contexte. */}
               <div className="flex gap-2 mt-3 flex-wrap">
                 <button
                   onClick={() => onConfirm(p.ean)}
                   disabled={isConfirmed}
                   aria-label={
                     isConfirmed
-                      ? `${productDesc}. Déjà confirmé.`
-                      : `Confirmer : ${productDesc}`
+                      ? `Déjà confirmé : ${productDesc}`
+                      : `Confirmer ce produit : ${productDesc}`
                   }
                   className={`px-4 py-2 rounded font-semibold transition-colors ${
                     isConfirmed
@@ -118,7 +126,7 @@ export function ProductResults({
                 {!isConfirmed && (
                   <button
                     onClick={() => onReject(item.query)}
-                    aria-label={`Voir un autre choix pour ${item.query}. Actuel : ${productDesc}`}
+                    aria-label={`Voir un autre ${item.query} à la place de ${p.title}, ${priceVocal}`}
                     className="px-4 py-2 rounded border border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger)] hover:text-white transition-colors"
                   >
                     Autre choix
@@ -127,7 +135,7 @@ export function ProductResults({
                 {onRemove && (
                   <button
                     onClick={() => onRemove(item.query)}
-                    aria-label={`Retirer ${productDesc} de ma liste`}
+                    aria-label={`Retirer ${p.title} de ma liste de courses`}
                     className="px-4 py-2 rounded border border-[var(--text-muted)] text-[var(--text-muted)] hover:border-[var(--danger)] hover:text-[var(--danger)] transition-colors text-sm"
                   >
                     Retirer

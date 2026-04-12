@@ -26,65 +26,95 @@ export function ListClarification({
       </p>
 
       <ul className="space-y-3" role="list">
-        {items.map((item, index) => (
-          <li
-            key={index}
-            className={`p-4 rounded-lg border-2 ${
-              item.status === "clear"
-                ? "border-[var(--success)] bg-[var(--bg-surface)]"
-                : item.status === "ambiguous"
-                  ? "border-[var(--accent)] bg-[var(--bg-surface)]"
-                  : "border-[var(--danger)] bg-[var(--bg-surface)]"
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <span
-                aria-hidden="true"
-                className={`text-lg ${
-                  item.status === "clear"
-                    ? "text-[var(--success)]"
+        {items.map((item, index) => {
+          const statusLabel =
+            item.status === "clear"
+              ? "validé"
+              : item.status === "ambiguous"
+                ? "à préciser"
+                : "incompris";
+          // aria-label complet pour les items CLEAR (pas d'action possible,
+          // juste de l'info) — pour que le SR annonce "1 sur 5, lait demi-écrémé,
+          // validé, recherche : lait demi ecreme"
+          const clearItemLabel = `Article ${index + 1} sur ${items.length}, ${item.originalText}, ${statusLabel}${item.status === "clear" ? `, recherche : ${item.query}` : ""}`;
+
+          return (
+            <li
+              key={index}
+              {...(item.status === "clear"
+                ? { tabIndex: 0, "aria-label": clearItemLabel }
+                : {})}
+              className={`p-4 rounded-lg border-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] ${
+                item.status === "clear"
+                  ? "border-[var(--success)] bg-[var(--bg-surface)]"
+                  : item.status === "ambiguous"
+                    ? "border-[var(--accent)] bg-[var(--bg-surface)]"
+                    : "border-[var(--danger)] bg-[var(--bg-surface)]"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  aria-hidden="true"
+                  className={`text-lg ${
+                    item.status === "clear"
+                      ? "text-[var(--success)]"
+                      : item.status === "ambiguous"
+                        ? "text-[var(--accent)]"
+                        : "text-[var(--danger)]"
+                  }`}
+                >
+                  {item.status === "clear"
+                    ? "✓"
                     : item.status === "ambiguous"
-                      ? "text-[var(--accent)]"
-                      : "text-[var(--danger)]"
-                }`}
-              >
-                {item.status === "clear" ? "✓" : item.status === "ambiguous" ? "?" : "✗"}
-              </span>
-              <div className="flex-1">
-                <div className="font-semibold">{item.originalText}</div>
-                {item.status === "clear" && (
-                  <div className="text-sm text-[var(--text-muted)]">
-                    Recherche : {item.query}
-                  </div>
-                )}
-                {item.clarificationQuestion && (
-                  <div className="mt-2 font-medium">{item.clarificationQuestion}</div>
-                )}
-                {item.suggestions && item.suggestions.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {item.suggestions.map((suggestion) => (
-                      <button
-                        key={suggestion}
-                        onClick={() =>
-                          onUpdate(index, {
-                            query: suggestion,
-                            status: "clear",
-                            clarificationQuestion: undefined,
-                            suggestions: undefined,
-                          })
-                        }
-                        className="px-3 py-1.5 rounded border border-[var(--accent)] text-[var(--accent)] text-sm hover:bg-[var(--accent)] hover:text-[var(--bg)] transition-colors"
-                        aria-label={`Choisir : ${suggestion}`}
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                      ? "?"
+                      : "✗"}
+                </span>
+                <div className="flex-1">
+                  <div className="font-semibold">{item.originalText}</div>
+                  {item.status === "clear" && (
+                    <div className="text-sm text-[var(--text-muted)]">
+                      Recherche : {item.query}
+                    </div>
+                  )}
+                  {item.clarificationQuestion && (
+                    <div
+                      className="mt-2 font-medium"
+                      id={`clarif-q-${index}`}
+                    >
+                      {item.clarificationQuestion}
+                    </div>
+                  )}
+                  {item.suggestions && item.suggestions.length > 0 && (
+                    <div
+                      className="flex flex-wrap gap-2 mt-2"
+                      role="group"
+                      aria-labelledby={`clarif-q-${index}`}
+                    >
+                      {item.suggestions.map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() =>
+                            onUpdate(index, {
+                              query: suggestion,
+                              status: "clear",
+                              clarificationQuestion: undefined,
+                              suggestions: undefined,
+                            })
+                          }
+                          className="px-3 py-1.5 rounded border border-[var(--accent)] text-[var(--accent)] text-sm hover:bg-[var(--accent)] hover:text-[var(--bg)] transition-colors"
+                          aria-label={`Pour ${item.originalText}, choisir : ${suggestion}`}
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
 
       <button

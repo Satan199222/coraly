@@ -60,12 +60,14 @@ export default function Home() {
   useFocusAnnounce(voiceEnabled);
 
   // ── Focus management ───────────────────────────────────────────────────────
-  const mainRef = useRef<HTMLDivElement>(null);
+  // On place le focus sur le heading de l'étape courante (h2) plutôt que sur
+  // un <div> générique. Le screen reader annonce ainsi le contexte immédiat
+  // ("Choisir votre magasin, niveau 2") plutôt que tout le header de la page.
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
 
-  const focusMain = useCallback(() => {
-    // Give the DOM time to re-render before focusing
+  const focusStepHeading = useCallback(() => {
     setTimeout(() => {
-      mainRef.current?.focus();
+      stepHeadingRef.current?.focus();
     }, 50);
   }, []);
 
@@ -96,10 +98,19 @@ export default function Home() {
     }
   }, []);
 
-  // ── Step transitions: move focus to main content ───────────────────────────
+  // ── Step transitions: move focus to step heading ──────────────────────────
   useEffect(() => {
-    focusMain();
-  }, [step, focusMain]);
+    focusStepHeading();
+  }, [step, focusStepHeading]);
+
+  // Titre dynamique selon l'étape (lu par le screen reader au changement de focus)
+  const stepTitle = {
+    store: "Étape 1 sur 4 : Choisissez votre magasin",
+    input: "Étape 2 sur 4 : Votre liste de courses",
+    clarification: "Étape 3 sur 4 : Précisez votre liste",
+    results: "Étape 3 sur 4 : Choisissez vos produits",
+    cart: "Étape 4 sur 4 : Votre panier",
+  }[step];
 
   // ── Store selected ─────────────────────────────────────────────────────────
   async function handleStoreSelected(store: CarrefourStore, bsid: string) {
@@ -224,12 +235,20 @@ export default function Home() {
   }
 
   function handleRemove(query: string) {
+    // Retrouver l'EAN associé à cette query AVANT de filtrer, pour pouvoir
+    // le retirer de confirmedEans.
+    const removedEan = matchedItems.find((item) => item.query === query)
+      ?.product?.ean;
+
     setMatchedItems((prev) => prev.filter((item) => item.query !== query));
-    setConfirmedEans((prev) => {
-      const next = new Set(prev);
-      // Remove any ean that belonged to this query
-      return next;
-    });
+
+    if (removedEan) {
+      setConfirmedEans((prev) => {
+        const next = new Set(prev);
+        next.delete(removedEan);
+        return next;
+      });
+    }
     announce(`Produit retiré de la liste.`);
   }
 
@@ -342,17 +361,24 @@ export default function Home() {
       {/* aria-live region rendered once, never removed */}
       <LiveRegion message={announcement} />
 
-      <div
-        ref={mainRef}
-        tabIndex={-1}
-        className="max-w-2xl mx-auto px-4 py-8 space-y-8 outline-none"
-      >
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
         <header>
           <h1 className="text-3xl font-bold">VoixCourses</h1>
           <p className="text-[var(--text-muted)] mt-1">
             Dictez ou tapez votre liste. L'IA remplit votre panier Carrefour.
           </p>
         </header>
+
+        {/* Heading d'étape — reçoit le focus à chaque changement d'étape.
+            Le screen reader annonce ainsi le contexte au lieu du header complet. */}
+        <h2
+          ref={stepHeadingRef}
+          tabIndex={-1}
+          className="sr-only focus:not-sr-only focus:text-xl focus:font-bold focus:outline-none"
+          aria-live="polite"
+        >
+          {stepTitle}
+        </h2>
 
         {/* Phase 1 — Store selection */}
         {step === "store" && (
@@ -387,6 +413,17 @@ export default function Home() {
         {/* Phase 3 — Results */}
         {step === "results" && (
           <>
+            {/* Skip link vers le bouton final — utile quand il y a beaucoup
+                de produits. Visible uniquement au focus. */}
+            {allConfirmed && (
+              <a
+                href="#add-to-cart-button"
+                className="sr-only focus:not-sr-only focus:inline-block focus:px-4 focus:py-2 focus:bg-[var(--accent)] focus:text-[var(--bg)] focus:rounded focus:font-semibold"
+              >
+                Aller directement au bouton Ajouter au panier
+              </a>
+            )}
+
             <ProductResults
               items={matchedItems}
               onConfirm={handleConfirm}
@@ -423,15 +460,36 @@ export default function Home() {
             </form>
 
             {/* Add to cart button — visible once all found products are confirmed */}
-            {allConfirmed && (
-              <button
-                onClick={handleAddToCart}
-                disabled={isLoading}
-                className="w-full px-6 py-4 rounded-lg bg-[var(--accent)] text-[var(--bg)] font-bold text-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
-              >
-                {isLoading ? "Ajout en cours..." : "Ajouter tout au panier Carrefour"}
-              </button>
-            )}
+            {allConfirmed && (() => {
+              // Calculer le total estimé pour l'annonce vocale
+              const confirmedProducts = matchedItems
+                .filter((m) => m.product && confirmedEans.has(m.product.ean))
+                .map((m) => m.product!);
+              const totalEstimated = confirmedProducts.reduce(
+                (sum, p) => sum + (p.price ?? 0),
+                0
+              );
+              const count = confirmedProducts.length;
+              const totalText = totalEstimated.toFixed(2).replace(".", " euros ");
+
+              return (
+                <button
+                  id="add-to-cart-button"
+                  onClick={handleAddToCart}
+                  disabled={isLoading}
+                  aria-label={
+                    isLoading
+                      ? "Ajout en cours au panier Carrefour"
+                      : `Ajouter au panier Carrefour : ${count} produit${count > 1 ? "s" : ""}, total estimé ${totalText}`
+                  }
+                  className="w-full px-6 py-4 rounded-lg bg-[var(--accent)] text-[var(--bg)] font-bold text-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
+                >
+                  {isLoading
+                    ? "Ajout en cours..."
+                    : `Ajouter tout au panier Carrefour (${count} produit${count > 1 ? "s" : ""}, ${totalEstimated.toFixed(2)}€)`}
+                </button>
+              );
+            })()}
           </>
         )}
 
