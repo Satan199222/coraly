@@ -48,6 +48,14 @@ const LOCALE_OPTIONS: { value: SpeechLocale; label: string }[] = [
   { value: "fr-CA", label: "Canada" },
 ];
 
+/** Style visuel propre à chaque thème — le bouton porte son thème. */
+const THEME_BUTTON_STYLES: Record<Theme, React.CSSProperties> = {
+  "clair":      { background: "#F4EEE3", color: "#0D1B2A", border: "2px solid #0D1B2A" },
+  "sombre":     { background: "#0D1B2A", color: "#F4EEE3", border: "2px solid rgba(244,238,227,0.5)" },
+  "jaune-noir": { background: "#FFEB00", color: "#000000", border: "2px solid #000000" },
+  "blanc-bleu": { background: "#003366", color: "#FFFFFF", border: "2px solid rgba(255,255,255,0.6)" },
+};
+
 function isTheme(v: string | null): v is Theme {
   return v === "clair" || v === "sombre" || v === "jaune-noir" || v === "blanc-bleu";
 }
@@ -78,6 +86,7 @@ export function AccessibilityBar({
     if (typeof window === "undefined") return "18px";
     return safeLocalGet("voixcourses-font-size") || "18px";
   });
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     const saved = safeLocalGet("voixcourses-voice-enabled");
@@ -129,12 +138,21 @@ export function AccessibilityBar({
       }}
     >
       {/* Barre principale — ne wrap jamais, scroll horizontal si besoin.
-          Tous les boutons font 52 px de haut (cible WCAG 2.5.8 ≥ 44 px).
-          shrink-0 sur chaque bouton : ils ne se compriment jamais. */}
+          Tous les boutons font 52 px (WCAG 2.5.8 ≥ 44 px), shrink-0. */}
       <div
         className="flex items-center gap-2 px-4 py-2"
         style={{ overflowX: "auto", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
       >
+        {/* — Titre — */}
+        <span
+          className="shrink-0 font-bold text-sm"
+          style={{ whiteSpace: "nowrap", color: "var(--text-on-ink)" }}
+        >
+          Confort de lecture
+        </span>
+
+        <div className="shrink-0 mx-2 w-px h-8" style={{ background: "var(--text-on-ink-faint)" }} aria-hidden="true" />
+
         {/* — Taille du texte — */}
         <button
           type="button"
@@ -142,11 +160,7 @@ export function AccessibilityBar({
           disabled={decreaseDisabled}
           onClick={() => setFontSize(FONT_SIZES[Math.max(0, currentSizeIdx - 1)])}
           className="shrink-0 rounded-lg border-2 font-bold disabled:opacity-40 transition-colors"
-          style={{
-            width: 52, height: 52, fontSize: 17,
-            borderColor: "var(--text-on-ink-faint)",
-            color: "var(--text-on-ink)",
-          }}
+          style={{ width: 52, height: 52, fontSize: 16, borderColor: "var(--text-on-ink-faint)", color: "var(--text-on-ink)" }}
         >
           Aa −
         </button>
@@ -156,19 +170,14 @@ export function AccessibilityBar({
           disabled={increaseDisabled}
           onClick={() => setFontSize(FONT_SIZES[Math.min(FONT_SIZES.length - 1, currentSizeIdx + 1)])}
           className="shrink-0 rounded-lg border-2 font-bold disabled:opacity-40 transition-colors"
-          style={{
-            width: 52, height: 52, fontSize: 17,
-            borderColor: "var(--text-on-ink-faint)",
-            color: "var(--text-on-ink)",
-          }}
+          style={{ width: 52, height: 52, fontSize: 16, borderColor: "var(--text-on-ink-faint)", color: "var(--text-on-ink)" }}
         >
           Aa +
         </button>
 
-        {/* séparateur */}
-        <div className="shrink-0 mx-1 w-px h-8" style={{ background: "var(--text-on-ink-faint)" }} aria-hidden="true" />
+        <div className="shrink-0 mx-2 w-px h-8" style={{ background: "var(--text-on-ink-faint)" }} aria-hidden="true" />
 
-        {/* — 4 thèmes — */}
+        {/* — 4 thèmes — chaque bouton porte visuellement son thème — */}
         {THEME_OPTIONS.map((opt) => {
           const active = theme === opt.value;
           return (
@@ -178,12 +187,15 @@ export function AccessibilityBar({
               aria-label={opt.aria}
               aria-pressed={active}
               onClick={() => setTheme(opt.value)}
-              className="shrink-0 rounded-lg border-2 font-bold transition-all"
+              className="shrink-0 rounded-lg font-bold transition-all"
               style={{
-                height: 52, padding: "0 18px", fontSize: 15, whiteSpace: "nowrap",
-                borderColor: active ? "var(--brass)" : "var(--text-on-ink-faint)",
-                background: active ? "var(--brass)" : "transparent",
-                color: active ? "var(--accent-ink)" : "var(--text-on-ink)",
+                height: 52,
+                padding: "0 14px",
+                fontSize: 14,
+                whiteSpace: "nowrap",
+                ...THEME_BUTTON_STYLES[opt.value],
+                outline: active ? "3px solid var(--brass)" : "none",
+                outlineOffset: "2px",
               }}
             >
               {opt.label}
@@ -191,8 +203,7 @@ export function AccessibilityBar({
           );
         })}
 
-        {/* séparateur */}
-        <div className="shrink-0 mx-1 w-px h-8" style={{ background: "var(--text-on-ink-faint)" }} aria-hidden="true" />
+        <div className="shrink-0 mx-2 w-px h-8" style={{ background: "var(--text-on-ink-faint)" }} aria-hidden="true" />
 
         {/* — Voix — */}
         <button
@@ -226,37 +237,44 @@ export function AccessibilityBar({
           </span>
         )}
 
-        {/* séparateur */}
-        {onHelpRequest && (
-          <div className="shrink-0 mx-1 w-px h-8" style={{ background: "var(--text-on-ink-faint)" }} aria-hidden="true" />
-        )}
+        <div className="shrink-0 mx-2 w-px h-8" style={{ background: "var(--text-on-ink-faint)" }} aria-hidden="true" />
+
+        {/* — Paramètres avancés — */}
+        <button
+          type="button"
+          aria-expanded={advancedOpen}
+          aria-controls="a11y-advanced-panel"
+          onClick={() => setAdvancedOpen((v) => !v)}
+          className="shrink-0 rounded-lg border-2 font-bold transition-colors"
+          style={{
+            height: 52, padding: "0 18px", fontSize: 15, whiteSpace: "nowrap",
+            borderColor: advancedOpen ? "var(--brass)" : "var(--text-on-ink-faint)",
+            background: advancedOpen ? "var(--brass)" : "transparent",
+            color: advancedOpen ? "var(--accent-ink)" : "var(--text-on-ink)",
+          }}
+        >
+          ⚙ Paramètres
+        </button>
 
         {onHelpRequest && (
-          <button
-            type="button"
-            onClick={onHelpRequest}
-            aria-label="Afficher l'aide et les raccourcis clavier"
-            className="shrink-0 rounded-lg border-2 font-bold transition-colors"
-            style={{
-              height: 52, padding: "0 18px", fontSize: 15, whiteSpace: "nowrap",
-              borderColor: "var(--text-on-ink-faint)",
-              color: "var(--text-on-ink)",
-            }}
-          >
-            ? Aide
-          </button>
+          <>
+            <div className="shrink-0 mx-2 w-px h-8" style={{ background: "var(--text-on-ink-faint)" }} aria-hidden="true" />
+            <button
+              type="button"
+              onClick={onHelpRequest}
+              aria-label="Afficher l'aide et les raccourcis clavier"
+              className="shrink-0 rounded-lg border-2 font-bold transition-colors"
+              style={{ height: 52, padding: "0 18px", fontSize: 15, whiteSpace: "nowrap", borderColor: "var(--text-on-ink-faint)", color: "var(--text-on-ink)" }}
+            >
+              ? Aide
+            </button>
+          </>
         )}
       </div>
 
-      {/* Préférences avancées — repliées par défaut */}
-      <details className="px-6 pb-3">
-        <summary
-          className="cursor-pointer text-sm py-2 font-semibold"
-          style={{ color: "var(--text-on-ink-muted)" }}
-          aria-label="Préférences avancées : vitesse vocale, régime alimentaire, variante du français, allergènes. Dépliez pour modifier."
-        >
-          ⚙ Préférences avancées (vitesse vocale, régime, variante, allergènes)
-        </summary>
+      {/* Préférences avancées — panneau dédié */}
+      {advancedOpen && (
+      <div id="a11y-advanced-panel" className="px-6 pb-4 pt-1">
 
         <div
           className="grid gap-4 mt-3 md:grid-cols-2 text-sm"
@@ -393,7 +411,8 @@ export function AccessibilityBar({
             />
           </fieldset>
         </div>
-      </details>
+      </div>
+      )}
     </div>
   );
 }
