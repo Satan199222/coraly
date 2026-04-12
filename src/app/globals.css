@@ -56,7 +56,8 @@
 
   --accent:       #B58842;
   --accent-hover: #D4A35A;
-  --accent-ink:   #0D1B2A;
+  /* Distinct de --bg (#0D1B2A) pour que les panneaux restent visibles */
+  --accent-ink:   #1A3A5C;
   --brass:        #D4A35A;
 
   --border:       rgba(244, 238, 227, 0.12);
@@ -84,7 +85,8 @@
 
   --accent:       #FFEB00;
   --accent-hover: #FFFFFF;
-  --accent-ink:   #000000;
+  /* Distinct de --bg (#000000) : fond très sombre mais perceptible */
+  --accent-ink:   #111100;
   --brass:        #FFFFFF;
 
   --border:       #FFEB00;
@@ -112,7 +114,8 @@
 
   --accent:       #FFFFFF;
   --accent-hover: #E5ECFF;
-  --accent-ink:   #003366;
+  /* Distinct de --bg (#003366) : bleu nuit très foncé */
+  --accent-ink:   #001840;
   --brass:        #FFD166;
 
   --border:       rgba(255, 255, 255, 0.25);

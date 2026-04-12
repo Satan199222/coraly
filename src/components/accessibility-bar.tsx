@@ -124,8 +124,8 @@ export function AccessibilityBar({
       className="border-b"
       style={{
         background: "var(--accent-ink)",
-        color: "var(--bg)",
-        borderColor: "rgba(244,238,227,0.1)",
+        color: "var(--text-on-ink)",
+        borderColor: "var(--text-on-ink-faint)",
       }}
     >
       {/* Ligne compacte : Aa-/+ · 4 thèmes · voix · préférences · aide */}
@@ -134,7 +134,7 @@ export function AccessibilityBar({
           <span
             aria-hidden="true"
             className="inline-flex items-center justify-center w-7 h-7 rounded-full border-2 text-sm font-bold"
-            style={{ borderColor: "var(--bg)" }}
+            style={{ borderColor: "var(--text-on-ink)" }}
           >
             Aa
           </span>
@@ -151,7 +151,7 @@ export function AccessibilityBar({
               setFontSize(FONT_SIZES[Math.max(0, currentSizeIdx - 1)])
             }
             className="px-3 py-1.5 rounded border text-sm font-semibold disabled:opacity-40"
-            style={{ borderColor: "rgba(244,238,227,0.3)", color: "var(--bg)" }}
+            style={{ borderColor: "var(--text-on-ink-faint)", color: "var(--text-on-ink)" }}
           >
             Aa −
           </button>
@@ -163,7 +163,7 @@ export function AccessibilityBar({
               setFontSize(FONT_SIZES[Math.min(FONT_SIZES.length - 1, currentSizeIdx + 1)])
             }
             className="px-3 py-1.5 rounded border text-sm font-semibold disabled:opacity-40"
-            style={{ borderColor: "rgba(244,238,227,0.3)", color: "var(--bg)" }}
+            style={{ borderColor: "var(--text-on-ink-faint)", color: "var(--text-on-ink)" }}
           >
             Aa +
           </button>
@@ -182,9 +182,9 @@ export function AccessibilityBar({
                 onClick={() => setTheme(opt.value)}
                 className="px-3 py-1.5 rounded border text-sm"
                 style={{
-                  borderColor: active ? "var(--brass)" : "rgba(244,238,227,0.3)",
+                  borderColor: active ? "var(--brass)" : "var(--text-on-ink-faint)",
                   background: active ? "var(--brass)" : "transparent",
-                  color: active ? "var(--accent-ink)" : "var(--bg)",
+                  color: active ? "var(--accent-ink)" : "var(--text-on-ink)",
                   fontWeight: active ? 700 : 600,
                 }}
               >
@@ -207,9 +207,9 @@ export function AccessibilityBar({
             }}
             className="px-3 py-1.5 rounded border text-sm font-semibold"
             style={{
-              borderColor: voiceEnabled ? "var(--brass)" : "rgba(244,238,227,0.3)",
+              borderColor: voiceEnabled ? "var(--brass)" : "var(--text-on-ink-faint)",
               background: voiceEnabled ? "var(--brass)" : "transparent",
-              color: voiceEnabled ? "var(--accent-ink)" : "var(--bg)",
+              color: voiceEnabled ? "var(--accent-ink)" : "var(--text-on-ink)",
             }}
           >
             🔊 Voix {voiceEnabled ? "active" : "coupée"}
@@ -232,7 +232,7 @@ export function AccessibilityBar({
               onClick={onHelpRequest}
               aria-label="Afficher l'aide et les raccourcis clavier"
               className="px-3 py-1.5 rounded border text-sm font-semibold"
-              style={{ borderColor: "rgba(244,238,227,0.3)", color: "var(--bg)" }}
+              style={{ borderColor: "var(--text-on-ink-faint)", color: "var(--text-on-ink)" }}
             >
               ? Aide
             </button>
@@ -244,7 +244,7 @@ export function AccessibilityBar({
       <details className="px-6 pb-3">
         <summary
           className="cursor-pointer text-sm py-2 font-semibold"
-          style={{ color: "rgba(244,238,227,0.85)" }}
+          style={{ color: "var(--text-on-ink-muted)" }}
           aria-label="Préférences avancées : vitesse vocale, régime alimentaire, variante du français, allergènes. Dépliez pour modifier."
         >
           ⚙ Préférences avancées (vitesse vocale, régime, variante, allergènes)
@@ -252,15 +252,15 @@ export function AccessibilityBar({
 
         <div
           className="grid gap-4 mt-3 md:grid-cols-2 text-sm"
-          style={{ color: "var(--bg)" }}
+          style={{ color: "var(--text-on-ink)" }}
         >
           {/* Régime alimentaire */}
           <fieldset
             className="rounded p-3"
-            style={{ border: "1px solid rgba(244,238,227,0.2)" }}
+            style={{ border: "1px solid var(--text-on-ink-faint)" }}
           >
             <legend className="px-2 font-semibold">Régime alimentaire</legend>
-            <p className="text-xs mb-2" style={{ color: "rgba(244,238,227,0.7)" }}>
+            <p className="text-xs mb-2" style={{ color: "var(--text-on-ink-muted)" }}>
               Appliqué à toutes vos recherches.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -275,9 +275,9 @@ export function AccessibilityBar({
                     aria-label={`Régime ${opt.label}${active ? ", activé" : ", désactivé"}`}
                     className="px-3 py-1 rounded border text-sm"
                     style={{
-                      borderColor: active ? "var(--brass)" : "rgba(244,238,227,0.3)",
+                      borderColor: active ? "var(--brass)" : "var(--text-on-ink-faint)",
                       background: active ? "var(--brass)" : "transparent",
-                      color: active ? "var(--accent-ink)" : "var(--bg)",
+                      color: active ? "var(--accent-ink)" : "var(--text-on-ink)",
                       fontWeight: active ? 700 : 500,
                     }}
                   >
@@ -291,7 +291,7 @@ export function AccessibilityBar({
           {/* Synthèse vocale */}
           <fieldset
             className="rounded p-3"
-            style={{ border: "1px solid rgba(244,238,227,0.2)" }}
+            style={{ border: "1px solid var(--text-on-ink-faint)" }}
           >
             <legend className="px-2 font-semibold">Synthèse vocale</legend>
 
@@ -305,9 +305,9 @@ export function AccessibilityBar({
                 onChange={(e) => update({ speechRate: e.target.value as SpeechRate })}
                 className="rounded px-2 py-1 text-sm"
                 style={{
-                  background: "rgba(244,238,227,0.1)",
-                  color: "var(--bg)",
-                  border: "1px solid rgba(244,238,227,0.3)",
+                  background: "var(--text-on-ink-faint)",
+                  color: "var(--text-on-ink)",
+                  border: "1px solid var(--text-on-ink-faint)",
                 }}
               >
                 {RATE_OPTIONS.map((o) => (
@@ -328,9 +328,9 @@ export function AccessibilityBar({
                 onChange={(e) => update({ speechLocale: e.target.value as SpeechLocale })}
                 className="rounded px-2 py-1 text-sm"
                 style={{
-                  background: "rgba(244,238,227,0.1)",
-                  color: "var(--bg)",
-                  border: "1px solid rgba(244,238,227,0.3)",
+                  background: "var(--text-on-ink-faint)",
+                  color: "var(--text-on-ink)",
+                  border: "1px solid var(--text-on-ink-faint)",
                 }}
               >
                 {LOCALE_OPTIONS.map((o) => (
@@ -351,7 +351,7 @@ export function AccessibilityBar({
               />
               <span className="font-semibold">✨ Voix premium (ElevenLabs)</span>
             </label>
-            <p id="premium-voice-help" className="text-xs mt-1 ml-6" style={{ color: "rgba(244,238,227,0.7)" }}>
+            <p id="premium-voice-help" className="text-xs mt-1 ml-6" style={{ color: "var(--text-on-ink-muted)" }}>
               Voix studio en ligne. Désactivez pour la voix native du navigateur (offline).
             </p>
           </fieldset>
@@ -359,10 +359,10 @@ export function AccessibilityBar({
           {/* Allergènes */}
           <fieldset
             className="rounded p-3 md:col-span-2"
-            style={{ border: "1px solid rgba(244,238,227,0.2)" }}
+            style={{ border: "1px solid var(--text-on-ink-faint)" }}
           >
             <legend className="px-2 font-semibold">Allergènes à éviter</legend>
-            <p className="text-xs mb-2" style={{ color: "rgba(244,238,227,0.7)" }}>
+            <p className="text-xs mb-2" style={{ color: "var(--text-on-ink-muted)" }}>
               Séparés par des virgules — ex : arachide, fruits à coque, moutarde.
             </p>
             <input
@@ -377,9 +377,9 @@ export function AccessibilityBar({
               }}
               className="w-full px-3 py-2 rounded text-sm"
               style={{
-                background: "rgba(244,238,227,0.1)",
-                color: "var(--bg)",
-                border: "1px solid rgba(244,238,227,0.3)",
+                background: "var(--text-on-ink-faint)",
+                color: "var(--text-on-ink)",
+                border: "1px solid var(--text-on-ink-faint)",
               }}
               aria-label="Liste des allergènes à éviter, séparés par des virgules"
             />

@@ -14,7 +14,7 @@ export function WalkthroughDialog() {
           Chaque échange est annoncé au lecteur d&apos;écran.
         </p>
 
-        <div className="grid gap-4 max-w-[760px]">
+        <div className="flex flex-col gap-4 max-w-[760px]">
           <Bubble who="Koraly">Que puis-je ajouter à votre panier&nbsp;?</Bubble>
           <Bubble who="Vous">Des pommes Golden, un kilo.</Bubble>
           <Bubble who="Koraly">

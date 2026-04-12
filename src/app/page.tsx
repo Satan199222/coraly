@@ -49,13 +49,34 @@ export default function HomePage() {
 
   useWelcomeAudio({ voiceEnabled, speak });
 
-  const playDemo = useCallback(() => {
-    speak(
+  const playDemo = useCallback(async () => {
+    const text =
       "Bonjour, je suis Koraly. Dites-moi ce dont vous avez besoin. " +
-        "Par exemple : pommes Golden, lait demi-écrémé, pain complet."
-    ).catch((err) => {
-      console.error("[home] playDemo speak failed:", err);
-    });
+      "Par exemple : pommes Golden, lait demi-écrémé, pain complet.";
+
+    // La démo doit toujours jouer la vraie voix ElevenLabs pour convaincre —
+    // on ne passe pas par prefs.premiumVoice, on appelle /api/tts directement.
+    if (typeof navigator !== "undefined" && navigator.onLine !== false) {
+      try {
+        const res = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const audio = new Audio(url);
+          audio.onended = () => URL.revokeObjectURL(url);
+          audio.onerror = () => URL.revokeObjectURL(url);
+          await audio.play();
+          return;
+        }
+      } catch (err) {
+        console.warn("[home] playDemo ElevenLabs failed, fallback natif:", err);
+      }
+    }
+    speak(text).catch((err) => console.error("[home] playDemo speak failed:", err));
   }, [speak]);
 
   useKeyboardShortcuts({
