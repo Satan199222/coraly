@@ -10,6 +10,7 @@ import { ListClarification } from "@/components/list-clarification";
 import { ProductResults } from "@/components/product-results";
 import { CartHandoff } from "@/components/cart-handoff";
 import { HelpDialog } from "@/components/help-dialog";
+import { InstallExtensionBanner } from "@/components/install-extension-banner";
 import { useSpeech } from "@/lib/speech/use-speech";
 import { useFocusAnnounce } from "@/lib/speech/use-focus-announce";
 import { useLongTaskAnnounce } from "@/lib/speech/use-long-task-announce";
@@ -744,6 +745,10 @@ export default function Home() {
         {/* Indicateur d'étape visuel — complément aux annonces ARIA pour les
             utilisateurs voyants qui veulent situer leur progression. */}
         <StepProgress step={step} />
+
+        {/* Suggestion d'installation de l'extension — affichée uniquement
+            si non installée et navigateur supporté. Se masque au dismiss. */}
+        {step !== "cart" && <InstallExtensionBanner />}
 
 
         <h2

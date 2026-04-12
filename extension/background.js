@@ -65,14 +65,20 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
   }
 
   if (message.type === "SET_LIST") {
-    const { storeRef, basketServiceId, items, eans, title } =
+    const { storeRef, basketServiceId, items, eans, title, returnUrl } =
       message.payload || {};
 
-    // Accepte `items: [{ean, quantity}]` (nouveau) OU `eans: [...]` (legacy)
+    // Accepte `items: [{ean, quantity, title?, price?}]` (nouveau)
+    // ou `eans: [...]` (legacy, sans détail produit)
     const normalizedItems = Array.isArray(items)
-      ? items
+      ? items.map((i) => ({
+          ean: i.ean,
+          quantity: i.quantity || 1,
+          title: i.title || null,
+          price: typeof i.price === "number" ? i.price : null,
+        }))
       : Array.isArray(eans)
-        ? eans.map((ean) => ({ ean, quantity: 1 }))
+        ? eans.map((ean) => ({ ean, quantity: 1, title: null, price: null }))
         : null;
 
     if (
@@ -91,6 +97,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
       basketServiceId,
       items: normalizedItems,
       title: title || `${count} produit${count > 1 ? "s" : ""}`,
+      returnUrl: typeof returnUrl === "string" ? returnUrl : null,
       createdAt: Date.now(),
     };
 

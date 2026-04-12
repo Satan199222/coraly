@@ -66,9 +66,13 @@ export async function sendListToExtension(
   payload: {
     storeRef: string;
     basketServiceId: string;
-    /** Liste des produits avec leurs quantités. */
-    items: Array<{ ean: string; quantity: number }>;
+    /** Liste des produits. `title` et `price` permettent à l'extension
+     *  d'afficher le détail et d'annoncer "Lait Lactel non ajouté" en cas
+     *  d'échec spécifique plutôt qu'un EAN opaque. */
+    items: Array<{ ean: string; quantity: number; title?: string; price?: number }>;
     title?: string;
+    /** URL pour revenir vers l'app web (bouton "Modifier ma liste" dans la bannière). */
+    returnUrl?: string;
   }
 ): Promise<{ ok: boolean; error?: string; itemCount?: number }> {
   return new Promise((resolve) => {

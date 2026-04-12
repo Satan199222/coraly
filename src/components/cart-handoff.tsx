@@ -60,8 +60,15 @@ export function CartHandoff({
       items: cart!.items.map((i) => ({
         ean: i.ean,
         quantity: i.quantity || 1,
+        title: i.title,
+        // Le price stocké dans CartItem est déjà multiplié par quantity ;
+        // on transmet le prix unitaire pour que la bannière puisse afficher
+        // "2 × Lait Lactel 1,26€".
+        price:
+          i.quantity && i.quantity > 0 ? i.price / i.quantity : i.price,
       })),
       title: `${cart!.items.length} produit${cart!.items.length > 1 ? "s" : ""} · ${cart!.totalAmount.toFixed(2)}€`,
+      returnUrl: typeof window !== "undefined" ? window.location.origin : undefined,
     });
 
     setSending(false);
@@ -192,17 +199,16 @@ export function CartHandoff({
 
         <div className="p-4 rounded bg-[var(--accent)] bg-opacity-10 border border-[var(--accent)] mb-4">
           <p className="text-sm">
-            <strong>Solution recommandée : installer l'extension VoixCourses</strong>
+            <strong>Solution recommandée : installer l&apos;extension VoixCourses</strong>
             <br />
             1 clic pour remplir votre panier, 100% accessible au clavier.
             <br />
             <a
-              href="https://chrome.google.com/webstore/category/extensions"
-              className="underline text-[var(--accent)]"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/installer"
+              className="underline text-[var(--accent)] font-semibold"
+              aria-label="Voir la procédure d'installation de l'extension"
             >
-              Installer l'extension (Chrome Web Store — bientôt disponible)
+              Voir la procédure d&apos;installation →
             </a>
           </p>
         </div>

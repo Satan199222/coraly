@@ -1,38 +1,40 @@
 /**
  * Script injecté sur toutes les pages carrefour.fr.
  *
- * Rôle : si une liste VoixCourses est en attente dans le storage de
- * l'extension, afficher une bannière accessible avec un bouton "Remplir
- * mon panier". Au clic, appelle les API Carrefour avec les cookies
- * de l'utilisateur (session native) et redirige vers /mon-panier.
+ * Comportement :
+ * - Si une liste VoixCourses est en attente : bannière + voix ON d'emblée
+ * - Sinon : voix OFF par défaut pour ne pas polluer la navigation Carrefour
+ *   ordinaire d'un utilisateur qui consulte simplement le site.
  */
 
 const STORAGE_KEY = "voixcourses-pending-list";
+/** TTL : au-delà, la liste est considérée périmée (abandonnée) */
+const LIST_TTL_MS = 24 * 60 * 60 * 1000;
 const BANNER_ID = "voixcourses-banner";
+const POST_FILL_KEY = "voixcourses-just-filled";
 
-/**
- * Synthèse vocale accessible dans le contexte carrefour.fr.
- * Toujours active dans l'extension — l'utilisateur a volontairement installé
- * l'extension pour l'assistance vocale, pas besoin d'opt-in supplémentaire.
- *
- * Prononciation française : prix en "X euros YY centimes", unités étendues.
- */
-// Utilise l'API partagée chargée par voice-core.js (déclaré avant dans le manifest)
 const { tts } = window.__voixcoursesTTS;
-
-// Les helpers de focus, greeting, toggle sont dans voice-core.js
 
 function getPendingList() {
   return new Promise((resolve) => {
     chrome.storage.local.get([STORAGE_KEY], (result) => {
-      resolve(result[STORAGE_KEY] || null);
+      const list = result[STORAGE_KEY];
+      if (!list) {
+        resolve(null);
+        return;
+      }
+      // TTL : au-delà, on considère la liste abandonnée. Nettoyage automatique
+      // pour éviter qu'une liste de la semaine dernière réapparaisse.
+      if (list.createdAt && Date.now() - list.createdAt > LIST_TTL_MS) {
+        chrome.storage.local.remove([STORAGE_KEY]);
+        resolve(null);
+        return;
+      }
+      resolve(list);
     });
   });
 }
 
-/**
- * Lire le panier actuel de l'utilisateur (dans sa session).
- */
 async function readCurrentCart() {
   try {
     const res = await fetch("/api/cart", {
@@ -62,10 +64,6 @@ async function readCurrentCart() {
   }
 }
 
-/**
- * Vérifier si l'utilisateur est connecté à Carrefour.
- * Retourne { loggedIn: boolean, firstName?: string }.
- */
 async function checkAuth() {
   try {
     const res = await fetch("/api/me", {
@@ -91,9 +89,6 @@ async function checkAuth() {
   }
 }
 
-/**
- * Supprimer un produit du panier (counter: 0).
- */
 async function removeFromCart(basketServiceId, ean) {
   return fetch("/api/cart", {
     method: "PATCH",
@@ -120,9 +115,6 @@ async function removeFromCart(basketServiceId, ean) {
   });
 }
 
-/**
- * Normaliser la liste en format { ean, quantity } — support legacy eans[].
- */
 function getItems(list) {
   if (Array.isArray(list.items)) return list.items;
   if (Array.isArray(list.eans))
@@ -130,12 +122,69 @@ function getItems(list) {
   return [];
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 /**
- * Remplir le panier Carrefour avec les items fournis (ean + quantity).
- * S'exécute dans la session utilisateur (mêmes cookies que la page).
+ * PATCH un item avec retry + backoff sur 429/erreurs réseau.
+ * Les erreurs 4xx non-429 (ex: 404 produit disparu) ne sont pas retry.
+ */
+async function patchCartOnce(list, item, quantity, attempt = 0) {
+  try {
+    const res = await fetch("/api/cart", {
+      method: "PATCH",
+      headers: {
+        "x-requested-with": "XMLHttpRequest",
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        trackingRequest: {
+          pageType: "productdetail",
+          pageId: "productdetail",
+        },
+        items: [
+          {
+            basketServiceId: list.basketServiceId,
+            counter: quantity,
+            ean: item.ean,
+            subBasketType: "drive_clcv",
+          },
+        ],
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+
+    // 429 (rate limit) ou 5xx : retry max 2 fois
+    if ((res.status === 429 || res.status >= 500) && attempt < 2) {
+      const delay = 500 * Math.pow(2, attempt); // 500ms, 1s
+      await sleep(delay);
+      return patchCartOnce(list, item, quantity, attempt + 1);
+    }
+
+    return { ok: false, status: res.status };
+  } catch (err) {
+    // Erreur réseau : retry aussi
+    if (attempt < 2) {
+      await sleep(500 * Math.pow(2, attempt));
+      return patchCartOnce(list, item, quantity, attempt + 1);
+    }
+    return { ok: false, error: String(err) };
+  }
+}
+
+/**
+ * Remplit le panier Carrefour. Throttle de 200ms entre chaque item pour
+ * rester sous le rate-limit Carrefour, et rapport de progression au caller.
+ *
+ * Retourne failures[] avec title + ean pour que l'appelant puisse annoncer
+ * précisément "Lait Lactel non ajouté" plutôt qu'un EAN opaque.
  */
 async function fillCart(list, onProgress) {
-  // 1. Sélectionner le magasin VoixCourses
   await fetch(`/set-store/${list.storeRef}`, {
     headers: {
       "x-requested-with": "XMLHttpRequest",
@@ -147,66 +196,68 @@ async function fillCart(list, onProgress) {
   const failures = [];
   let lastTotal = 0;
   const items = getItems(list);
-  const total = items.length;
+  const totalCount = items.length;
 
-  // 2. Ajouter chaque produit avec sa quantité demandée, en rapportant la
-  //    progression au caller pour que l'utilisateur non-voyant sache où on en est.
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
-    try {
-      const res = await fetch("/api/cart", {
-        method: "PATCH",
-        headers: {
-          "x-requested-with": "XMLHttpRequest",
-          "content-type": "application/json",
-          accept: "application/json",
-        },
-        credentials: "same-origin",
-        body: JSON.stringify({
-          trackingRequest: {
-            pageType: "productdetail",
-            pageId: "productdetail",
-          },
-          items: [
-            {
-              basketServiceId: list.basketServiceId,
-              counter: quantity,
-              ean: item.ean,
-              subBasketType: "drive_clcv",
-            },
-          ],
-        }),
-      });
 
-      if (!res.ok) {
-        failures.push(item.ean);
-        if (typeof onProgress === "function") {
-          onProgress({ done: i + 1, total, ok: false, ean: item.ean });
-        }
-        continue;
-      }
-
-      const data = await res.json();
-      lastTotal = data?.cart?.totalAmount ?? lastTotal;
+    const result = await patchCartOnce(list, item, quantity);
+    if (result.ok) {
+      lastTotal = result.data?.cart?.totalAmount ?? lastTotal;
       if (typeof onProgress === "function") {
-        onProgress({ done: i + 1, total, ok: true, ean: item.ean });
+        onProgress({ done: i + 1, total: totalCount, ok: true, item });
       }
-    } catch {
-      failures.push(item.ean);
+    } else {
+      failures.push({ ean: item.ean, title: item.title || null });
       if (typeof onProgress === "function") {
-        onProgress({ done: i + 1, total, ok: false, ean: item.ean });
+        onProgress({ done: i + 1, total: totalCount, ok: false, item });
       }
     }
+
+    // Throttle : espace les requêtes pour ne pas saturer l'API Carrefour.
+    // 200ms × 20 items = 4s, acceptable. Sans ça, risque de 429.
+    if (i < items.length - 1) await sleep(200);
   }
 
   return { failures, total: lastTotal };
 }
 
 /**
- * Utilitaire pour créer un élément avec attributs et styles.
- * Approche safe-DOM (pas d'innerHTML).
+ * Après le remplissage, détecter les substitutions : un EAN demandé qui ne
+ * se retrouve pas dans le panier Carrefour (même si PATCH OK) signifie que
+ * Carrefour a substitué ou n'a pas pu ajouter. Important pour l'utilisateur
+ * non-voyant qui doit savoir que sa marque habituelle a été remplacée.
  */
+async function detectSubstitutions(list, initialEans) {
+  try {
+    const cart = await readCurrentCart();
+    const requestedEans = new Set(getItems(list).map((i) => i.ean));
+    const inCartNow = new Set(cart.eans);
+    const alreadyThere = new Set(initialEans);
+
+    // Items demandés mais absents du panier final = substitués/échec
+    const missing = [];
+    for (const item of getItems(list)) {
+      if (!inCartNow.has(item.ean)) {
+        missing.push(item);
+      }
+    }
+
+    // Produits présents mais non demandés ET pas là avant → potentielle substitution
+    const addedUnexpected = [];
+    for (const ean of inCartNow) {
+      if (!requestedEans.has(ean) && !alreadyThere.has(ean)) {
+        addedUnexpected.push(ean);
+      }
+    }
+
+    return { missing, addedUnexpected };
+  } catch {
+    return { missing: [], addedUnexpected: [] };
+  }
+}
+
 function el(tag, options = {}) {
   const e = document.createElement(tag);
   if (options.id) e.id = options.id;
@@ -220,23 +271,15 @@ function el(tag, options = {}) {
   return e;
 }
 
-/**
- * Afficher la bannière VoixCourses en haut de la page carrefour.fr.
- * Conçue pour être accessible clavier + screen reader.
- *
- * Contenu dynamique :
- * - Affiche l'état de connexion (si non connecté, suggère de se connecter)
- * - Affiche le nombre d'articles déjà dans le panier
- * - Propose "Ajouter à mon panier" (garde les existants) ou "Remplacer"
- */
 async function showBanner(list) {
   if (document.getElementById(BANNER_ID)) return;
 
-  // Récupérer l'état actuel en parallèle
   const [currentCart, auth] = await Promise.all([
     readCurrentCart(),
     checkAuth(),
   ]);
+  // Conserver l'état initial pour détection des substitutions après fillCart
+  const initialEans = [...currentCart.eans];
 
   const banner = el("div", {
     id: BANNER_ID,
@@ -248,11 +291,14 @@ async function showBanner(list) {
       "position:fixed;top:0;left:0;right:0;z-index:2147483647;" +
       "background:#0f0f1a;color:#f0f0f5;border-bottom:3px solid #4cc9f0;" +
       "padding:16px 24px;font-family:system-ui,sans-serif;font-size:16px;" +
-      "display:flex;align-items:center;justify-content:space-between;gap:16px;" +
+      "display:flex;flex-direction:column;gap:12px;" +
       "box-shadow:0 2px 12px rgba(0,0,0,0.3);",
   });
 
-  // Partie gauche : titre + description de la liste + état actuel
+  // Ligne 1 : titre + statut connexion/panier
+  const headerLine = el("div", {
+    style: "display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;",
+  });
   const left = el("div", { style: "flex:1;min-width:0" });
 
   const topLine = el("div", { style: "margin-bottom:4px" });
@@ -264,48 +310,45 @@ async function showBanner(list) {
   );
   left.appendChild(topLine);
 
-  // Ligne statut : connexion + panier actuel
   const statusLine = el("div", {
     style: "font-size:13px;color:#a0a8b8",
   });
 
-  // Connexion
   if (auth.loggedIn) {
-    const loggedSpan = el("span", {
-      text: `✓ Connecté${auth.firstName ? ` (${auth.firstName})` : ""}`,
-      style: "color:#2ee8a5;font-weight:600",
-    });
-    statusLine.appendChild(loggedSpan);
+    statusLine.appendChild(
+      el("span", {
+        text: `✓ Connecté${auth.firstName ? ` (${auth.firstName})` : ""}`,
+        style: "color:#2ee8a5;font-weight:600",
+      })
+    );
   } else {
-    const notLoggedSpan = el("span", {
-      text: "⚠ Non connecté",
-      style: "color:#ffd166;font-weight:600",
-    });
-    statusLine.appendChild(notLoggedSpan);
+    statusLine.appendChild(
+      el("span", {
+        text: "⚠ Non connecté",
+        style: "color:#ffd166;font-weight:600",
+      })
+    );
     statusLine.appendChild(document.createTextNode(" — "));
     const loginLink = el("a", {
       text: "Se connecter pour payer",
-      href: "/mon-compte/login",
       style: "color:#4cc9f0;text-decoration:underline",
     });
+    loginLink.href = "/mon-compte/login";
     statusLine.appendChild(loginLink);
   }
 
   statusLine.appendChild(document.createTextNode(" · "));
 
-  // Panier actuel
   if (currentCart.itemCount > 0) {
-    const cartSpan = el("span", {
-      text: `Panier actuel : ${currentCart.itemCount} article${currentCart.itemCount > 1 ? "s" : ""} (${currentCart.total.toFixed(2)}€)`,
-      style: "color:#ffd166",
-    });
-    statusLine.appendChild(cartSpan);
-  } else {
     statusLine.appendChild(
-      document.createTextNode("Panier actuel vide")
+      el("span", {
+        text: `Panier actuel : ${currentCart.itemCount} article${currentCart.itemCount > 1 ? "s" : ""} (${currentCart.total.toFixed(2)}€)`,
+        style: "color:#ffd166",
+      })
     );
+  } else {
+    statusLine.appendChild(document.createTextNode("Panier actuel vide"));
   }
-
   left.appendChild(statusLine);
 
   // Partie droite : boutons
@@ -316,19 +359,20 @@ async function showBanner(list) {
   const listItems = getItems(list);
   const itemCount = listItems.length;
 
-  // Bouton principal : ajoute à l'existant
   const fillBtn = el("button", {
     id: "voixcourses-fill",
-    text: currentCart.itemCount > 0
-      ? `Ajouter (${itemCount})`
-      : `Remplir mon panier (${itemCount})`,
+    text:
+      currentCart.itemCount > 0
+        ? `Ajouter (${itemCount})`
+        : `Remplir mon panier (${itemCount})`,
     attrs: {
       "aria-label":
         currentCart.itemCount > 0
-          ? `Ajouter ${itemCount} produit${itemCount > 1 ? "s" : ""} VoixCourses à votre panier existant de ${currentCart.itemCount} article${currentCart.itemCount > 1 ? "s" : ""}`
-          : `Remplir mon panier Carrefour avec ${itemCount} produit${itemCount > 1 ? "s" : ""} de VoixCourses`,
+          ? `Ajouter ${itemCount} produit${itemCount > 1 ? "s" : ""} VoixCourses à votre panier existant de ${currentCart.itemCount} article${currentCart.itemCount > 1 ? "s" : ""}. Raccourci : touche R.`
+          : `Remplir mon panier Carrefour avec ${itemCount} produit${itemCount > 1 ? "s" : ""} de VoixCourses. Raccourci : touche R.`,
       type: "button",
       "data-action": "add",
+      accesskey: "r",
     },
     style:
       "padding:10px 20px;background:#4cc9f0;color:#0f0f1a;border:0;" +
@@ -336,13 +380,13 @@ async function showBanner(list) {
   });
   right.appendChild(fillBtn);
 
-  // Bouton "Remplacer" visible seulement si le panier n'est pas vide
+  let replaceBtn = null;
   if (currentCart.itemCount > 0) {
-    const replaceBtn = el("button", {
+    replaceBtn = el("button", {
       id: "voixcourses-replace",
       text: "Remplacer",
       attrs: {
-        "aria-label": `Vider mon panier actuel (${currentCart.itemCount} article${currentCart.itemCount > 1 ? "s" : ""}) et le remplacer par la liste VoixCourses (${itemCount} produit${itemCount > 1 ? "s" : ""})`,
+        "aria-label": `Vider mon panier actuel et le remplacer par la liste VoixCourses.`,
         type: "button",
         "data-action": "replace",
       },
@@ -353,12 +397,34 @@ async function showBanner(list) {
     right.appendChild(replaceBtn);
   }
 
+  // Lien "Modifier ma liste" — retour vers voixcourses.fr.
+  // Utile si l'utilisateur réalise qu'il a oublié un produit avant de valider.
+  let editBtn = null;
+  if (list.returnUrl) {
+    editBtn = el("button", {
+      id: "voixcourses-edit",
+      text: "Modifier ma liste",
+      attrs: {
+        "aria-label":
+          "Retourner sur VoixCourses pour modifier la liste. Raccourci : touche E.",
+        type: "button",
+        accesskey: "e",
+      },
+      style:
+        "padding:10px 16px;background:transparent;color:#4cc9f0;" +
+        "border:1px solid #4cc9f0;border-radius:8px;font-size:14px;cursor:pointer;",
+    });
+    right.appendChild(editBtn);
+  }
+
   const dismissBtn = el("button", {
     id: "voixcourses-dismiss",
     text: "Ignorer",
     attrs: {
-      "aria-label": "Ignorer cette liste VoixCourses",
+      "aria-label":
+        "Ignorer cette liste VoixCourses. Raccourci : touche I.",
       type: "button",
+      accesskey: "i",
     },
     style:
       "padding:10px 16px;background:transparent;color:#f0f0f5;" +
@@ -366,43 +432,92 @@ async function showBanner(list) {
   });
   right.appendChild(dismissBtn);
 
-  // Zone aria-live (visible screen reader only)
+  headerLine.appendChild(left);
+  headerLine.appendChild(right);
+  banner.appendChild(headerLine);
+
+  // Ligne 2 : détail de la liste (collapsible) — informations que l'utilisateur
+  // non-voyant peut vouloir réentendre avant de valider.
+  const hasTitles = listItems.some((i) => i.title);
+  if (hasTitles) {
+    const details = el("details", {
+      style: "margin-top:4px;",
+    });
+    const summary = el("summary", {
+      text: `Voir le détail des ${itemCount} produits`,
+      style:
+        "cursor:pointer;color:#a0a8b8;font-size:13px;padding:4px 0;",
+      attrs: {
+        "aria-label": `Afficher la liste détaillée des ${itemCount} produits à transférer`,
+      },
+    });
+    details.appendChild(summary);
+
+    const ul = el("ul", {
+      style:
+        "margin:8px 0 0 0;padding:0 0 0 20px;font-size:13px;max-height:180px;overflow-y:auto;",
+    });
+    for (const item of listItems) {
+      const li = el("li", { style: "margin-bottom:4px;" });
+      const qty = item.quantity && item.quantity > 1 ? `${item.quantity} × ` : "";
+      const price =
+        typeof item.price === "number"
+          ? ` — ${item.price.toFixed(2)}€`
+          : "";
+      li.textContent = `${qty}${item.title || item.ean}${price}`;
+      ul.appendChild(li);
+    }
+    details.appendChild(ul);
+    banner.appendChild(details);
+  }
+
+  // Ligne 3 : progress bar (cachée par défaut, apparaît pendant fillCart)
+  const progressWrap = el("div", {
+    id: "voixcourses-progress-wrap",
+    style:
+      "display:none;height:6px;background:#1a1a2e;border-radius:3px;overflow:hidden;",
+    attrs: { "aria-hidden": "true" },
+  });
+  const progressBar = el("div", {
+    id: "voixcourses-progress-bar",
+    style:
+      "height:100%;width:0%;background:#4cc9f0;transition:width 0.15s ease;",
+  });
+  progressWrap.appendChild(progressBar);
+  banner.appendChild(progressWrap);
+
+  // Zone aria-live (invisible)
   const status = el("div", {
     id: "voixcourses-status",
     attrs: { role: "status", "aria-live": "polite" },
     style:
       "position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;",
   });
-
-  banner.appendChild(left);
-  banner.appendChild(right);
   banner.appendChild(status);
 
   document.documentElement.appendChild(banner);
-
-  // Décaler le contenu de Carrefour sous la bannière : sans ce padding,
-  // la bannière fixed recouvre le header Carrefour (search bar, compte…).
-  // On mesure la hauteur APRÈS insertion pour gérer le wrapping responsive,
-  // et on réagit aux resize via ResizeObserver.
   applyBodyOffset(banner);
 
-
-  // ── Annonce vocale de bienvenue : recap complet ──────────────────────
+  // Annonce vocale — toujours prononcée quand une liste est en attente,
+  // même si on vient de visiter la page il y a 20 min. C'est un moment d'action.
   const authText = auth.loggedIn
     ? `Connecté${auth.firstName ? " en tant que " + auth.firstName : ""}`
     : "Attention, vous n'êtes pas connecté à Carrefour. Vous devrez vous connecter avant le paiement";
-  const cartStatus = currentCart.itemCount > 0
-    ? `Votre panier contient déjà ${currentCart.itemCount} article${currentCart.itemCount > 1 ? "s" : ""} pour ${currentCart.total.toFixed(2)} euros`
-    : "Votre panier est vide";
-  const actions = currentCart.itemCount > 0
-    ? "Trois boutons disponibles : Ajouter pour garder vos articles existants, Remplacer pour les remplacer, Ignorer pour annuler"
-    : "Deux boutons disponibles : Remplir mon panier ou Ignorer";
+  const cartStatus =
+    currentCart.itemCount > 0
+      ? `Votre panier contient déjà ${currentCart.itemCount} article${currentCart.itemCount > 1 ? "s" : ""} pour ${currentCart.total.toFixed(2)} euros`
+      : "Votre panier est vide";
+  const actions = [];
+  actions.push(`R pour remplir avec ${itemCount} produits`);
+  if (replaceBtn) actions.push("Remplacer pour vider puis remplir");
+  if (editBtn) actions.push("E pour modifier la liste");
+  actions.push("I pour ignorer");
 
-  const recap = `VoixCourses. Liste prête : ${list.title}. ${authText}. ${cartStatus}. ${actions}.`;
+  const recap = `VoixCourses. Liste prête : ${list.title}. ${authText}. ${cartStatus}. Raccourcis : ${actions.join(", ")}.`;
   tts.speak(recap);
 
-  // ── Annonce vocale au focus des boutons ─────────────────────────────
   function addFocusSpeaker(btn) {
+    if (!btn) return;
     btn.addEventListener("focus", () => {
       const label = btn.getAttribute("aria-label") || btn.textContent || "";
       tts.speak(label);
@@ -410,19 +525,15 @@ async function showBanner(list) {
   }
   addFocusSpeaker(fillBtn);
   addFocusSpeaker(dismissBtn);
-  const replaceBtnEl = document.getElementById("voixcourses-replace");
-  if (replaceBtnEl) addFocusSpeaker(replaceBtnEl);
+  addFocusSpeaker(replaceBtn);
+  addFocusSpeaker(editBtn);
 
-  // Focus automatique sur le bouton principal (avec délai pour laisser le TTS démarrer)
   setTimeout(() => fillBtn.focus(), 100);
 
-  /**
-   * Ajouter la liste au panier — optionnellement après avoir vidé l'existant.
-   */
-  async function applyList(mode /* "add" | "replace" */) {
+  async function applyList(mode) {
     fillBtn.setAttribute("disabled", "true");
-    const replaceBtn = document.getElementById("voixcourses-replace");
     if (replaceBtn) replaceBtn.setAttribute("disabled", "true");
+    if (editBtn) editBtn.setAttribute("disabled", "true");
 
     if (mode === "replace" && currentCart.eans.length > 0) {
       const msg = `Suppression des ${currentCart.itemCount} articles existants`;
@@ -438,48 +549,85 @@ async function showBanner(list) {
     status.textContent = progressMsg;
     fillBtn.textContent = "Ajout en cours...";
     tts.speak(progressMsg);
+    progressWrap.style.display = "block";
 
-    // Progression : annonce discrète tous les 2 items pour ne pas saturer
-    // l'audio (ex: panier de 15 items = 7-8 annonces, acceptable).
-    const { failures, total } = await fillCart(list, ({ done, total: t }) => {
+    const { failures, total } = await fillCart(list, ({ done, total: t, ok, item }) => {
+      const pct = Math.round((done / t) * 100);
+      progressBar.style.width = `${pct}%`;
       fillBtn.textContent = `Ajout ${done} sur ${t}...`;
-      // Mise à jour continue dans aria-live (silencieuse tant que polite)
       status.textContent = `Ajout ${done} sur ${t}`;
-      // TTS : uniquement tous les 2 items, ou au dernier, pour rester audible
-      const shouldSpeak = done === t || done % 2 === 0;
-      if (shouldSpeak && done < t) {
-        tts.speak(`${done} sur ${t}`);
+
+      // Annonce vocale : à chaque étape si un item a échoué (on veut savoir
+      // lequel précisément), sinon tous les 2 pour rester audible.
+      if (!ok) {
+        const label = item.title ? item.title : `un produit`;
+        tts.speak(`${label} non ajouté.`);
+      } else {
+        const shouldSpeak = done === t || done % 2 === 0;
+        if (shouldSpeak && done < t) tts.speak(`${done} sur ${t}`);
       }
     });
 
-    if (failures.length === 0) {
+    // Détection substitutions après coup
+    const { missing, addedUnexpected } = await detectSubstitutions(
+      list,
+      mode === "replace" ? [] : initialEans
+    );
+    const substituted = missing.filter(
+      (m) =>
+        !failures.some((f) => f.ean === m.ean) && m.title
+    );
+
+    if (failures.length === 0 && substituted.length === 0) {
       const successMsg = `Panier rempli. ${itemCount} produit${itemCount > 1 ? "s" : ""} pour ${total.toFixed(2)} euros. Redirection vers votre panier.`;
       status.textContent = successMsg;
       tts.speak(successMsg);
       chrome.storage.local.remove([STORAGE_KEY]);
-      // Flag pour que la page panier annonce vocalement le résultat final
       chrome.storage.local.set({ [POST_FILL_KEY]: { at: Date.now() } });
       setTimeout(() => {
         window.location.href = "/cart/driveclcv";
       }, 1800);
     } else {
-      const errorMsg = `Ajout terminé avec ${failures.length} erreur${failures.length > 1 ? "s" : ""}. Total : ${total.toFixed(2)} euros.`;
-      status.textContent = errorMsg;
-      tts.speak(errorMsg);
+      const parts = [];
+      if (failures.length > 0) {
+        const names = failures
+          .map((f) => f.title)
+          .filter(Boolean)
+          .slice(0, 3);
+        const extra = failures.length > 3 ? ` et ${failures.length - 3} autres` : "";
+        parts.push(
+          names.length > 0
+            ? `${failures.length} échec${failures.length > 1 ? "s" : ""} : ${names.join(", ")}${extra}`
+            : `${failures.length} échec${failures.length > 1 ? "s" : ""}`
+        );
+      }
+      if (substituted.length > 0) {
+        const names = substituted
+          .map((s) => s.title)
+          .filter(Boolean)
+          .slice(0, 3);
+        parts.push(
+          `${substituted.length} possiblement substitué${substituted.length > 1 ? "s" : ""} par Carrefour : ${names.join(", ")}`
+        );
+      }
+      const summary = `Ajout terminé. Total : ${total.toFixed(2)} euros. ${parts.join(". ")}.`;
+      status.textContent = summary;
+      tts.speak(summary);
       fillBtn.removeAttribute("disabled");
-      fillBtn.textContent = `Panier partiellement rempli (${failures.length} erreur${failures.length > 1 ? "s" : ""})`;
+      fillBtn.textContent = `Panier partiellement rempli`;
     }
   }
 
   fillBtn.addEventListener("click", () => applyList("add"));
-
-  const replaceBtn = document.getElementById("voixcourses-replace");
   if (replaceBtn) {
     replaceBtn.addEventListener("click", () => {
-      const confirmMsg = `Voulez-vous vider votre panier actuel (${currentCart.itemCount} article${currentCart.itemCount > 1 ? "s" : ""}) et le remplacer par la liste VoixCourses (${itemCount} produit${itemCount > 1 ? "s" : ""}) ?`;
-      if (window.confirm(confirmMsg)) {
-        applyList("replace");
-      }
+      const confirmMsg = `Voulez-vous vider votre panier actuel et le remplacer par la liste VoixCourses ?`;
+      if (window.confirm(confirmMsg)) applyList("replace");
+    });
+  }
+  if (editBtn) {
+    editBtn.addEventListener("click", () => {
+      window.open(list.returnUrl, "_blank", "noopener,noreferrer");
     });
   }
 
@@ -488,16 +636,42 @@ async function showBanner(list) {
     clearBodyOffset();
     banner.remove();
   });
+
+  // Raccourcis globaux R / I / E tant que la bannière est à l'écran.
+  // Hors input/textarea — pour ne pas casser une saisie Carrefour en cours.
+  const keyHandler = (e) => {
+    const active = document.activeElement;
+    const isTyping =
+      active &&
+      (active.tagName === "INPUT" ||
+        active.tagName === "TEXTAREA" ||
+        active.isContentEditable);
+    if (isTyping) return;
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+    if (e.key === "r" || e.key === "R") {
+      e.preventDefault();
+      fillBtn.click();
+    } else if (e.key === "i" || e.key === "I") {
+      e.preventDefault();
+      dismissBtn.click();
+    } else if ((e.key === "e" || e.key === "E") && editBtn) {
+      e.preventDefault();
+      editBtn.click();
+    }
+  };
+  document.addEventListener("keydown", keyHandler, true);
+  // Nettoyer si la bannière est retirée
+  const observer = new MutationObserver(() => {
+    if (!document.getElementById(BANNER_ID)) {
+      document.removeEventListener("keydown", keyHandler, true);
+      observer.disconnect();
+    }
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
 }
 
-/**
- * Padding dynamique sur <body> égal à la hauteur du banner. Sauvegarde
- * l'ancien padding pour restauration propre au dismiss.
- *
- * Utilise ResizeObserver pour suivre les changements (wrapping mobile,
- * zoom navigateur, etc.) — sans ça, un utilisateur qui zoome à 150%
- * verrait la bannière s'étendre sur 2 lignes et masquer le contenu.
- */
+// ── Padding du body : éviter que la bannière masque le contenu Carrefour ──
 let savedBodyPaddingTop = null;
 let bannerResizeObserver = null;
 
@@ -507,9 +681,7 @@ function applyBodyOffset(banner) {
   }
   const apply = () => {
     const h = banner.getBoundingClientRect().height;
-    if (h > 0) {
-      document.body.style.paddingTop = `${Math.ceil(h)}px`;
-    }
+    if (h > 0) document.body.style.paddingTop = `${Math.ceil(h)}px`;
   };
   apply();
   if (typeof ResizeObserver !== "undefined") {
@@ -533,29 +705,19 @@ function clearBodyOffset() {
   }
 }
 
-/**
- * Annoncer l'arrivée sur la page panier Carrefour après un remplissage.
- * L'extension garde en mémoire qu'on vient de faire un fillCart, et
- * annonce vocalement le résumé quand la page /cart/ charge.
- */
-const POST_FILL_KEY = "voixcourses-just-filled";
-
 async function announceCartPage() {
   const isCartPage =
     location.pathname.includes("/cart") ||
     location.pathname.includes("/mon-panier");
   if (!isCartPage) return;
 
-  // Vérifier si on vient juste de remplir (flag mis avant redirect)
   const data = await new Promise((resolve) => {
     chrome.storage.local.get([POST_FILL_KEY], (r) => resolve(r[POST_FILL_KEY]));
   });
   if (!data) return;
 
-  // Nettoyer le flag
   chrome.storage.local.remove([POST_FILL_KEY]);
 
-  // Lire le panier et annoncer
   const cart = await readCurrentCart();
   const auth = await checkAuth();
   const authLine = auth.loggedIn
@@ -565,26 +727,49 @@ async function announceCartPage() {
   tts.speak(announcement);
 }
 
-// Au chargement de chaque page carrefour.fr :
-// 1. Installer la voix globale au focus (via voice-core.js)
-// 2. Message de bienvenue (1 fois par fenêtre de 30 min)
-// 3. Raccourci V pour réactiver la voix si désactivée
-// 4. Si liste en attente → bannière ; sinon si page panier → annonce
+// ── Bootstrap ─────────────────────────────────────────────────────────────
+// 1. Vérifier si liste VoixCourses en attente AVANT d'initialiser la voix
+// 2. Si liste : voix ON + bannière + greeting bypass
+// 3. Sinon : voix OFF par défaut (respect de l'utilisateur qui consulte Carrefour
+//    pour ses propres raisons, pas via VoixCourses)
 (async () => {
   const api = window.__voixcoursesTTS;
-  api.installFocusSpeaker();
-  api.installVoiceToggleShortcut();
-  await api.greetIfNeeded("Carrefour");
-
   const list = await getPendingList();
-  if (list) {
+  const hasPendingList = !!list;
+
+  // Si liste en attente : forcer voix ON, bypass anti-spam 30min → on doit parler.
+  // Sinon : respecter la préférence utilisateur mais ne pas greeter.
+  if (hasPendingList) {
+    api.installFocusSpeaker();
+    api.installVoiceToggleShortcut();
+    await api.greetIfNeeded("Carrefour", {
+      forceVoiceOn: true,
+      bypassWindow: true,
+    });
     showBanner(list);
   } else {
+    // Pas de liste VoixCourses. On ne greet pas, on laisse la page Carrefour
+    // en paix. La voix reste ON ou OFF selon la préférence (lue au init du tts).
+    // Le focus speaker n'est PAS installé — sinon toute la nav Carrefour
+    // devient vocale, pénible quand non désiré.
+    const pref = await new Promise((r) =>
+      chrome.storage.local.get(["voixcourses-voice-enabled"], (v) =>
+        r(v["voixcourses-voice-enabled"])
+      )
+    );
+    api.tts.enabled = pref === true; // OFF par défaut hors flux VoixCourses
+    if (api.tts.enabled) {
+      // Utilisateur a explicitement activé — on installe le focus speaker
+      api.installFocusSpeaker();
+      api.installVoiceToggleShortcut();
+    } else {
+      // Même si voix OFF, permettre V pour réactiver
+      api.installVoiceToggleShortcut();
+    }
     announceCartPage();
   }
 })();
 
-// Réagir si la liste change (autre onglet, nouvel envoi)
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes[STORAGE_KEY]) {
     const newList = changes[STORAGE_KEY].newValue;
