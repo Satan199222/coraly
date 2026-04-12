@@ -36,6 +36,12 @@ const SESSION_LIFETIME_MS = 25 * 60 * 1000; // 25 min (marge de 5 min)
 // @ts-expect-error globalThis augment pour réutilisation entre requêtes
 const warmupCache: Map<string, number> = (globalThis.__vc_warmup ??= new Map());
 
+// Single-flight : si N requêtes arrivent en parallèle et doivent toutes
+// warmup, on partage UNE seule Promise warmup pour éviter le rate limit
+// ScrapFly (429 Too Many Requests) quand 5 search déclenchent 5 warmups.
+// @ts-expect-error globalThis augment
+const warmupInflight: Map<string, Promise<void>> = (globalThis.__vc_warmup_inflight ??= new Map());
+
 interface ScrapflyOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: string;
@@ -112,16 +118,36 @@ function buildScrapflyUrl(params: {
 }
 
 /**
- * Résout le challenge Cloudflare pour cette session. Idempotent : n'exécute
- * le warmup que si la session est expirée ou jamais initialisée.
+ * Résout le challenge Cloudflare pour cette session.
+ *
+ * Idempotent ET single-flight :
+ * - Si session valide (warmup récent) → no-op
+ * - Si warmup déjà en cours → attend la même Promise (pas de duplicate call)
+ * - Sinon → exécute le warmup et cache le résultat
+ *
+ * Le single-flight évite les 429 ScrapFly quand N requêtes parallèles
+ * (ex: Promise.allSettled sur 5 search produits) déclenchent toutes le
+ * warmup en même temps sur une session froide.
  */
 async function ensureWarmup(session: string): Promise<void> {
   const last = warmupCache.get(session);
   const now = Date.now();
   if (last && now - last < SESSION_LIFETIME_MS) {
-    return; // session toujours valide, skip warmup
+    return; // session toujours valide
   }
 
+  // Déjà en cours : rejoindre la Promise existante au lieu d'en créer une nouvelle
+  const inflight = warmupInflight.get(session);
+  if (inflight) return inflight;
+
+  const promise = doWarmup(session).finally(() => {
+    warmupInflight.delete(session);
+  });
+  warmupInflight.set(session, promise);
+  return promise;
+}
+
+async function doWarmup(session: string): Promise<void> {
   const url = buildScrapflyUrl({
     targetUrl: `${CARREFOUR_ORIGIN}/`,
     asp: true,
@@ -141,7 +167,7 @@ async function ensureWarmup(session: string): Promise<void> {
       `ScrapFly warmup failed : ${wrapper.result?.error?.message ?? "inconnu"}`
     );
   }
-  warmupCache.set(session, now);
+  warmupCache.set(session, Date.now());
 }
 
 /**
