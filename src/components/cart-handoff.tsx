@@ -41,13 +41,29 @@ export function CartHandoff({
   };
   const bookmarkletUrl = generateBookmarklet(payload);
 
-  async function handleCopyBookmarklet() {
+  const [openedTab, setOpenedTab] = useState(false);
+
+  async function handleCopyAndOpen() {
     try {
       await navigator.clipboard.writeText(bookmarkletUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
+
+      // Ouvrir carrefour.fr dans un nouvel onglet
+      const newWindow = window.open(
+        "https://www.carrefour.fr",
+        "_blank",
+        "noopener,noreferrer"
+      );
+      if (newWindow) setOpenedTab(true);
+
+      // Reset après 10s pour que le message reste lisible
+      setTimeout(() => {
+        setCopied(false);
+        setOpenedTab(false);
+      }, 10000);
     } catch {
-      // Si la Clipboard API échoue, l'utilisateur peut drag-and-drop le lien
+      // Fallback si Clipboard API échoue (rare, mais sur certains browsers
+      // sans HTTPS ou sans permission, ça peut arriver)
     }
   }
 
@@ -113,39 +129,42 @@ export function CartHandoff({
 
         <ol className="space-y-3 list-decimal list-inside mb-4">
           <li>
-            <strong>Copier le lien magique ci-dessous</strong> dans le
-            presse-papiers
+            <strong>Cliquez sur le bouton ci-dessous</strong> — il copie le
+            lien magique ET ouvre carrefour.fr dans un nouvel onglet
           </li>
           <li>
-            Ouvrir{" "}
-            <a
-              href="https://www.carrefour.fr"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline text-[var(--accent)]"
-            >
-              carrefour.fr
-            </a>{" "}
-            dans un nouvel onglet
+            Dans le nouvel onglet carrefour.fr, appuyez sur{" "}
+            <kbd className="px-2 py-0.5 bg-[var(--bg)] rounded border border-[var(--border)]">
+              Ctrl+L
+            </kbd>{" "}
+            pour placer le curseur dans la barre d'adresse
           </li>
           <li>
-            <strong>Coller le lien</strong> dans la barre d'adresse (Ctrl+L puis
-            Ctrl+V) et appuyer sur Entrée
+            Appuyez sur{" "}
+            <kbd className="px-2 py-0.5 bg-[var(--bg)] rounded border border-[var(--border)]">
+              Ctrl+V
+            </kbd>{" "}
+            pour coller le lien magique, puis{" "}
+            <kbd className="px-2 py-0.5 bg-[var(--bg)] rounded border border-[var(--border)]">
+              Entrée
+            </kbd>
           </li>
           <li>
             Le panier se remplit automatiquement, vous arrivez sur la page
-            panier
+            panier Carrefour
           </li>
         </ol>
 
         <div className="flex gap-3 flex-wrap">
           <button
             type="button"
-            onClick={handleCopyBookmarklet}
+            onClick={handleCopyAndOpen}
             aria-label={
-              copied
-                ? "Lien copié dans le presse-papiers"
-                : `Copier le lien magique pour ajouter ${cart.items.length} produit${cart.items.length > 1 ? "s" : ""} au panier Carrefour`
+              copied && openedTab
+                ? `Lien copié et carrefour.fr ouvert dans un nouvel onglet. Dans l'onglet Carrefour : Ctrl+L puis Ctrl+V puis Entrée pour remplir votre panier.`
+                : copied
+                  ? "Lien copié. Ouvrez carrefour.fr et collez dans la barre d'adresse"
+                  : `Copier le lien magique et ouvrir Carrefour pour ajouter ${cart.items.length} produit${cart.items.length > 1 ? "s" : ""}`
             }
             className={`px-6 py-3 rounded-lg font-bold text-lg transition-colors ${
               copied
@@ -153,17 +172,12 @@ export function CartHandoff({
                 : "bg-[var(--accent)] text-[var(--bg)] hover:bg-[var(--accent-hover)]"
             }`}
           >
-            {copied ? "✓ Copié !" : "Copier le lien magique"}
+            {copied && openedTab
+              ? "✓ Prêt ! Allez dans l'onglet Carrefour → Ctrl+L → Ctrl+V → Entrée"
+              : copied
+                ? "✓ Copié ! Ouvrez carrefour.fr"
+                : "Copier et ouvrir Carrefour"}
           </button>
-
-          <a
-            href="https://www.carrefour.fr"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-6 py-3 rounded-lg border-2 border-[var(--accent)] text-[var(--accent)] font-bold text-lg hover:bg-[var(--accent)] hover:text-[var(--bg)] transition-colors"
-          >
-            Ouvrir carrefour.fr
-          </a>
         </div>
 
         <details className="mt-4">
