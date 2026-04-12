@@ -11,6 +11,8 @@ import {
 
 interface AccessibilityBarProps {
   onVoiceToggle?: (enabled: boolean) => void;
+  /** Ouvre le dialog d'aide — normalement déclenché aussi par `?`. */
+  onHelpRequest?: () => void;
 }
 
 const DIET_OPTIONS: { value: DietaryRestriction; label: string }[] = [
@@ -35,7 +37,10 @@ const LOCALE_OPTIONS: { value: SpeechLocale; label: string }[] = [
   { value: "fr-CA", label: "Canada" },
 ];
 
-export function AccessibilityBar({ onVoiceToggle }: AccessibilityBarProps = {}) {
+export function AccessibilityBar({
+  onVoiceToggle,
+  onHelpRequest,
+}: AccessibilityBarProps = {}) {
   const [theme, setTheme] = useState<string>(() => {
     if (typeof window === "undefined") return "dark";
     return localStorage.getItem("voixcourses-theme") || "dark";
@@ -141,6 +146,17 @@ export function AccessibilityBar({ onVoiceToggle }: AccessibilityBarProps = {}) 
           >
             ✓ Extension OK
           </span>
+        )}
+
+        {onHelpRequest && (
+          <button
+            type="button"
+            onClick={onHelpRequest}
+            aria-label="Afficher l'aide et les raccourcis clavier"
+            className="ml-auto px-3 py-2 rounded-lg border-2 border-[var(--border)] text-[var(--text)] font-bold hover:border-[var(--accent)] transition-colors"
+          >
+            ? Aide
+          </button>
         )}
       </div>
 

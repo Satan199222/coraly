@@ -9,8 +9,11 @@ import { GroceryInput } from "@/components/grocery-input";
 import { ListClarification } from "@/components/list-clarification";
 import { ProductResults } from "@/components/product-results";
 import { CartHandoff } from "@/components/cart-handoff";
+import { HelpDialog } from "@/components/help-dialog";
 import { useSpeech } from "@/lib/speech/use-speech";
 import { useFocusAnnounce } from "@/lib/speech/use-focus-announce";
+import { useLongTaskAnnounce } from "@/lib/speech/use-long-task-announce";
+import { useKeyboardShortcuts } from "@/lib/speech/use-keyboard-shortcuts";
 import {
   usePreferences,
   SPEECH_RATE_VALUE,
@@ -140,6 +143,7 @@ export default function Home() {
 
   // ── Accessibility / speech ─────────────────────────────────────────────────
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const { prefs, rememberChoice } = usePreferences();
   const history = useOrderHistory();
 
@@ -162,6 +166,30 @@ export default function Home() {
     lang: prefs.speechLocale,
   });
 
+  // Raccourcis clavier globaux : ? pour aide, Échap pour stopper voix /
+  // fermer dialog, M pour toggle micro (actif seulement en étape saisie).
+  useKeyboardShortcuts({
+    onHelp: () => setHelpOpen(true),
+    onEscape: () => {
+      if (helpOpen) {
+        setHelpOpen(false);
+        return;
+      }
+      cancelSpeech();
+      if (isListening) stopListening();
+    },
+    onToggleMic:
+      step === "input" && isSupported
+        ? () => {
+            if (isListening) {
+              stopListening();
+            } else {
+              startListening();
+            }
+          }
+        : undefined,
+  });
+
   // ── Focus management ───────────────────────────────────────────────────────
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
 
@@ -180,6 +208,11 @@ export default function Home() {
     },
     [speak, voiceEnabled]
   );
+
+  // Annonce "toujours en cours..." à 5s puis "prend plus de temps que prévu"
+  // à 15s, pendant analyse et recherche. Évite qu'un utilisateur non-voyant
+  // pense que l'app est plantée.
+  useLongTaskAnnounce(isLoading || isSearching, { announce });
 
   const alertCritical = useCallback(
     (msg: string) => {
@@ -678,7 +711,12 @@ export default function Home() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
-      <AccessibilityBar onVoiceToggle={setVoiceEnabled} />
+      <AccessibilityBar
+        onVoiceToggle={setVoiceEnabled}
+        onHelpRequest={() => setHelpOpen(true)}
+      />
+
+      <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
 
       {/* Annonces normales (polite) */}
       <LiveRegion message={announcement} />

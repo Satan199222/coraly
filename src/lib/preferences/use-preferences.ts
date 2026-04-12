@@ -68,6 +68,14 @@ function write(next: Preferences) {
   }
 }
 
+/**
+ * Réinitialise le cache mémoire du hook. Utilisé par les tests entre deux
+ * rendus pour éviter la pollution inter-tests — pas destiné à l'app runtime.
+ */
+export function __resetPreferencesCache() {
+  cache = null;
+}
+
 function subscribe(callback: () => void) {
   if (typeof window === "undefined") return () => {};
   const handler = () => {

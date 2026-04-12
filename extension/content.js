@@ -380,6 +380,13 @@ async function showBanner(list) {
 
   document.documentElement.appendChild(banner);
 
+  // Décaler le contenu de Carrefour sous la bannière : sans ce padding,
+  // la bannière fixed recouvre le header Carrefour (search bar, compte…).
+  // On mesure la hauteur APRÈS insertion pour gérer le wrapping responsive,
+  // et on réagit aux resize via ResizeObserver.
+  applyBodyOffset(banner);
+
+
   // ── Annonce vocale de bienvenue : recap complet ──────────────────────
   const authText = auth.loggedIn
     ? `Connecté${auth.firstName ? " en tant que " + auth.firstName : ""}`
@@ -478,8 +485,52 @@ async function showBanner(list) {
 
   dismissBtn.addEventListener("click", () => {
     chrome.storage.local.remove([STORAGE_KEY]);
+    clearBodyOffset();
     banner.remove();
   });
+}
+
+/**
+ * Padding dynamique sur <body> égal à la hauteur du banner. Sauvegarde
+ * l'ancien padding pour restauration propre au dismiss.
+ *
+ * Utilise ResizeObserver pour suivre les changements (wrapping mobile,
+ * zoom navigateur, etc.) — sans ça, un utilisateur qui zoome à 150%
+ * verrait la bannière s'étendre sur 2 lignes et masquer le contenu.
+ */
+let savedBodyPaddingTop = null;
+let bannerResizeObserver = null;
+
+function applyBodyOffset(banner) {
+  if (savedBodyPaddingTop === null) {
+    savedBodyPaddingTop = document.body.style.paddingTop || "";
+  }
+  const apply = () => {
+    const h = banner.getBoundingClientRect().height;
+    if (h > 0) {
+      document.body.style.paddingTop = `${Math.ceil(h)}px`;
+    }
+  };
+  apply();
+  if (typeof ResizeObserver !== "undefined") {
+    bannerResizeObserver = new ResizeObserver(apply);
+    bannerResizeObserver.observe(banner);
+  } else {
+    window.addEventListener("resize", apply);
+  }
+}
+
+function clearBodyOffset() {
+  if (bannerResizeObserver) {
+    bannerResizeObserver.disconnect();
+    bannerResizeObserver = null;
+  }
+  if (savedBodyPaddingTop !== null) {
+    document.body.style.paddingTop = savedBodyPaddingTop;
+    savedBodyPaddingTop = null;
+  } else {
+    document.body.style.paddingTop = "";
+  }
 }
 
 /**
@@ -538,7 +589,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes[STORAGE_KEY]) {
     const newList = changes[STORAGE_KEY].newValue;
     const existing = document.getElementById(BANNER_ID);
-    if (existing) existing.remove();
+    if (existing) {
+      clearBodyOffset();
+      existing.remove();
+    }
     if (newList) showBanner(newList);
   }
 });

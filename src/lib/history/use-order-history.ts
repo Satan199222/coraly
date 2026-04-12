@@ -41,6 +41,11 @@ function write(next: OrderEntry[]) {
   }
 }
 
+/** Reset du cache mémoire pour les tests — pas pour l'usage runtime. */
+export function __resetHistoryCache() {
+  cache = null;
+}
+
 function subscribe(callback: () => void) {
   if (typeof window === "undefined") return () => {};
   const handler = () => {
