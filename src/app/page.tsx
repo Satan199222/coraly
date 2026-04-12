@@ -125,6 +125,11 @@ export default function Home() {
   const [matchedItems, setMatchedItems] = useState<MatchedItem[]>([]);
   const [confirmedEans, setConfirmedEans] = useState<Set<string>>(new Set());
   const [isSearching, setIsSearching] = useState(false);
+  // Map ean → ref du bouton "Confirmer" de chaque carte produit. Permet de
+  // déplacer automatiquement le focus vers le prochain item non-confirmé
+  // après un clic Confirmer, au lieu de rester sur un bouton désactivé.
+  const confirmRefs = useRef(new Map<string, HTMLButtonElement | null>());
+  const validateBtnRef = useRef<HTMLButtonElement>(null);
 
   // ── Add-a-product input (bottom of results) ────────────────────────────────
   const [addQuery, setAddQuery] = useState("");
@@ -206,6 +211,24 @@ export default function Home() {
   useEffect(() => {
     focusStepHeading();
   }, [step, focusStepHeading]);
+
+  // Annonce contextuelle à l'arrivée dans l'étape "saisie" : si une commande
+  // précédente existe, informer l'utilisateur qu'il peut la reprendre.
+  // Sans ça, le bouton "Reprendre" ne serait jamais découvert sans Tab.
+  const announcedReuseRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (step !== "input" || !history.lastEntry) return;
+    if (announcedReuseRef.current === history.lastEntry.at) return;
+    announcedReuseRef.current = history.lastEntry.at;
+    // Délai pour laisser l'annonce d'étape ("Étape 2 sur 4...") passer avant.
+    const t = setTimeout(() => {
+      announce(
+        `Astuce : votre dernière commande de ${history.lastEntry!.count} produits est disponible. Appuyez sur Tab pour la reprendre.`
+      );
+    }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, history.lastEntry?.at]);
 
   const stepTitle = {
     store: "Étape 1 sur 4 : Choisissez votre magasin",
@@ -309,6 +332,10 @@ export default function Home() {
 
     const dietParam = prefs.diet.length > 0 ? prefs.diet.join(",") : "";
     let found = 0;
+    // Stocker localement le 1er produit trouvé — on ne peut pas lire le state
+    // React après les setMatchedItems (closure stale). Holder mutable pour
+    // que TS ne narrow pas le type à `null` (mutations en callback async).
+    const firstHolder: { value: CarrefourProduct | null } = { value: null };
 
     // Parallélisation totale + annonce progressive. Promise.allSettled évite
     // qu'une seule recherche en erreur n'arrête l'ensemble.
@@ -343,7 +370,7 @@ export default function Home() {
 
           if (hadResult) {
             found++;
-            // Annonce discrète au fur et à mesure pour ne pas surcharger
+            if (!firstHolder.value && candidates[0]) firstHolder.value = candidates[0];
             announce(`${found} produit${found > 1 ? "s" : ""} trouvé${found > 1 ? "s" : ""} sur ${items.length}.`);
           }
         } catch {
@@ -353,23 +380,93 @@ export default function Home() {
     );
 
     setIsSearching(false);
+
+    // Annonce finale enrichie : nombre trouvé + 1er produit en détail + conseil
+    // "Tout confirmer". Pour un utilisateur non-voyant, entendre le 1er produit
+    // directement évite un Tab à l'aveugle pour découvrir ce qui l'attend.
+    const first = firstHolder.value;
+    const firstDetail = first
+      ? ` Premier produit : ${first.title}, ${priceToSpeech(first.price ?? 0)}.`
+      : "";
+    const hint =
+      found > 1
+        ? ` Utilisez le bouton Tout confirmer pour tout valider d'un coup, ou examinez chaque produit individuellement.`
+        : found === 1
+          ? ` Examinez et confirmez.`
+          : "";
     announce(
-      `Recherche terminée. ${found} produit${found > 1 ? "s" : ""} trouvé${found > 1 ? "s" : ""} sur ${items.length}. Vérifiez et confirmez chaque produit.`
+      `Recherche terminée. ${found} produit${found > 1 ? "s" : ""} trouvé${found > 1 ? "s" : ""} sur ${items.length}.${firstDetail}${hint}`
     );
   }
 
   // ── Confirm / reject product ───────────────────────────────────────────────
   function handleConfirm(ean: string) {
-    setConfirmedEans((prev) => new Set([...prev, ean]));
     const match = matchedItems.find((m) => m.product?.ean === ean);
     const product = match?.product;
+    const nextConfirmed = new Set([...confirmedEans, ean]);
+    setConfirmedEans(nextConfirmed);
+
+    if (product && match?.query) {
+      rememberChoice(match.query, match.query);
+    }
+
+    // Chercher le prochain item non-confirmé (après celui qu'on vient de
+    // valider). Gros gain UX : au lieu de rester sur un bouton disabled et
+    // de tabber à travers les +/- quantité, on saute direct au prochain choix.
+    const remaining = matchedItems.filter(
+      (m) => m.product && !nextConfirmed.has(m.product.ean)
+    );
+    const allDone = remaining.length === 0;
+
     if (product) {
-      announce(`${product.title} confirmé. ${priceToSpeech(product.price ?? 0)}.`);
-      // Mémoriser le choix pour les futures dictées (ex: "yaourts" → "yaourts nature")
-      if (match?.query) {
-        rememberChoice(match.query, match.query);
+      if (allDone) {
+        announce(
+          `${product.title} confirmé. Tous les produits sont validés. Vous pouvez maintenant valider votre liste.`
+        );
+      } else {
+        const next = remaining[0].product!;
+        announce(
+          `${product.title} confirmé. Prochain : ${next.title}, ${priceToSpeech(next.price ?? 0)}.`
+        );
       }
     }
+
+    // Déplacer le focus après le render : vers le prochain Confirmer, ou
+    // vers le bouton Valider si on a terminé.
+    setTimeout(() => {
+      if (allDone) {
+        validateBtnRef.current?.focus();
+      } else {
+        const nextEan = remaining[0].product?.ean;
+        if (nextEan) {
+          confirmRefs.current.get(nextEan)?.focus();
+        }
+      }
+    }, 60);
+  }
+
+  // ── Tout confirmer d'un coup — gros gain pour l'habitué dont les
+  //    résultats sont souvent bons du premier coup. Un seul Tab+Enter plutôt
+  //    que N. On ne confirme que les items qui ont bien un produit trouvé.
+  function handleConfirmAll() {
+    const toConfirm = matchedItems
+      .filter((m) => m.product && !confirmedEans.has(m.product.ean))
+      .map((m) => m.product!.ean);
+
+    if (toConfirm.length === 0) return;
+
+    setConfirmedEans((prev) => new Set([...prev, ...toConfirm]));
+    for (const m of matchedItems) {
+      if (m.product && m.query && toConfirm.includes(m.product.ean)) {
+        rememberChoice(m.query, m.query);
+      }
+    }
+
+    announce(
+      `${toConfirm.length} produit${toConfirm.length > 1 ? "s" : ""} confirmé${toConfirm.length > 1 ? "s" : ""} d'un coup. Vous pouvez maintenant valider votre liste.`
+    );
+
+    setTimeout(() => validateBtnRef.current?.focus(), 60);
   }
 
   function handleReject(query: string) {
@@ -646,12 +743,23 @@ export default function Home() {
               setParsedItems((prev) =>
                 prev.map((item, i) => (i === index ? { ...item, ...update } : item))
               );
+              // Annoncer le choix : l'utilisateur doit savoir que son clic
+              // a bien été pris en compte, pas attendre un Tab suivant.
+              if (update.status === "clear" && update.query) {
+                const src = parsedItems[index]?.originalText ?? "";
+                announce(`${src} : ${update.query}. Validé.`);
+              }
             }}
             onRemove={(index) => {
+              const src = parsedItems[index]?.originalText ?? "";
               setParsedItems((prev) => prev.filter((_, i) => i !== index));
-              announce("Produit retiré de la liste.");
+              announce(`${src} retiré de la liste.`);
             }}
             onValidate={handleClarificationValidate}
+            onEditList={() => {
+              announce("Retour à la saisie. Votre texte est conservé.");
+              setStep("input");
+            }}
           />
         )}
 
@@ -666,6 +774,39 @@ export default function Home() {
               </a>
             )}
 
+            {/* Bouton "Tout confirmer" — gros accélérateur pour l'utilisateur
+                dont les 5 à 10 résultats semblent tous corrects. Placé AVANT
+                la liste : 1 seul Tab depuis le heading d'étape pour l'atteindre. */}
+            {!isSearching && matchedItems.some(
+              (m) => m.product && !confirmedEans.has(m.product.ean)
+            ) && (
+              <div className="flex gap-3 flex-wrap items-center">
+                <button
+                  type="button"
+                  onClick={handleConfirmAll}
+                  aria-label={`Tout confirmer : ${matchedItems.filter((m) => m.product && !confirmedEans.has(m.product.ean)).length} produits en un clic`}
+                  className="flex-1 min-w-[12rem] px-5 py-3 rounded-lg bg-[var(--success)] text-[var(--bg)] font-bold text-base hover:brightness-110 transition-all"
+                >
+                  ✓ Tout confirmer (
+                  {matchedItems.filter(
+                    (m) => m.product && !confirmedEans.has(m.product.ean)
+                  ).length}
+                  )
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    announce("Retour à la saisie. Votre texte est conservé.");
+                    setStep("input");
+                  }}
+                  aria-label="Modifier ma liste — retour à la saisie"
+                  className="px-4 py-3 rounded-lg border-2 border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--text)] transition-colors"
+                >
+                  Modifier ma liste
+                </button>
+              </div>
+            )}
+
             <div
               aria-busy={isSearching}
               aria-live="polite"
@@ -678,6 +819,7 @@ export default function Home() {
                 onIncrement={handleIncrement}
                 onDecrement={handleDecrement}
                 confirmedEans={confirmedEans}
+                confirmRefs={confirmRefs}
               />
             </div>
 
@@ -741,6 +883,7 @@ export default function Home() {
 
             {allConfirmed && (
               <button
+                ref={validateBtnRef}
                 id="add-to-cart-button"
                 onClick={handlePrepareCart}
                 aria-label={`Valider ma liste : ${confirmedProducts.length} produit${confirmedProducts.length > 1 ? "s" : ""}, ${articleCount} article${articleCount > 1 ? "s" : ""}, total estimé ${priceToSpeech(totalEstimated)}`}

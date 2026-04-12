@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ParsedGroceryItem } from "@/lib/carrefour/types";
 
 interface ListClarificationProps {
   items: ParsedGroceryItem[];
   onUpdate: (index: number, update: Partial<ParsedGroceryItem>) => void;
   onValidate: () => void;
-  /** Supprimer un item de la liste (utile si l'utilisateur ne veut plus le chercher) */
   onRemove?: (index: number) => void;
+  /** Bouton optionnel "Modifier ma liste" pour retourner à l'étape saisie. */
+  onEditList?: () => void;
 }
 
 export function ListClarification({
@@ -16,43 +17,73 @@ export function ListClarification({
   onUpdate,
   onValidate,
   onRemove,
+  onEditList,
 }: ListClarificationProps) {
   const allClear = items.every((i) => i.status === "clear");
+  const toReviewCount = items.filter((i) => i.status !== "clear").length;
+
+  // Afficher d'abord les items qui réclament une action, puis ceux déjà clairs.
+  // Pour un utilisateur clavier, Tab tombe immédiatement sur le travail
+  // restant au lieu de traverser N items validés inutilement.
+  const orderedItems = useMemo(() => {
+    return items
+      .map((item, originalIndex) => ({ item, originalIndex }))
+      .sort((a, b) => {
+        const aToDo = a.item.status !== "clear" ? 0 : 1;
+        const bToDo = b.item.status !== "clear" ? 0 : 1;
+        return aToDo - bToDo;
+      });
+  }, [items]);
 
   return (
     <section aria-label="Vérification de la liste">
-      <h2 className="text-xl font-bold mb-2">Vérification de votre liste</h2>
+      {/* h3 pour rester en-dessous du h2 d'étape invisible de page.tsx */}
+      <h3 className="text-xl font-bold mb-2">Vérification de votre liste</h3>
       <p className="text-[var(--text-muted)] mb-4">
         {allClear
           ? `${items.length} produits prêts pour la recherche.`
-          : `${items.filter((i) => i.status === "clear").length} clairs, ${items.filter((i) => i.status !== "clear").length} à préciser.`}
+          : `${items.filter((i) => i.status === "clear").length} validés, ${toReviewCount} à préciser.`}
       </p>
 
       <ul className="space-y-3" role="list">
-        {items.map((item, index) => (
+        {orderedItems.map(({ item, originalIndex }) => (
           <ClarificationItem
-            key={`${item.originalText}-${index}`}
+            key={`${item.originalText}-${originalIndex}`}
             item={item}
-            index={index}
+            index={originalIndex}
             total={items.length}
-            onUpdate={(update) => onUpdate(index, update)}
-            onRemove={onRemove ? () => onRemove(index) : undefined}
+            onUpdate={(update) => onUpdate(originalIndex, update)}
+            onRemove={onRemove ? () => onRemove(originalIndex) : undefined}
           />
         ))}
       </ul>
 
-      <button
-        onClick={onValidate}
-        disabled={!allClear}
-        className="w-full mt-6 px-6 py-4 rounded-lg bg-[var(--accent)] text-[var(--bg)] font-bold text-lg disabled:opacity-50 transition-colors"
-        aria-label={
-          allClear
-            ? `Lancer la recherche pour ${items.length} produits`
-            : "Précisez tous les produits avant de lancer la recherche"
-        }
-      >
-        {allClear ? "Lancer la recherche" : "Précisez les produits marqués pour continuer"}
-      </button>
+      <div className="flex gap-3 mt-6 flex-wrap">
+        <button
+          onClick={onValidate}
+          disabled={!allClear}
+          className="flex-1 px-6 py-4 rounded-lg bg-[var(--accent)] text-[var(--bg)] font-bold text-lg disabled:opacity-50 transition-colors"
+          aria-label={
+            allClear
+              ? `Lancer la recherche pour ${items.length} produits`
+              : `Précisez les ${toReviewCount} produits restants avant de lancer la recherche`
+          }
+        >
+          {allClear
+            ? "Lancer la recherche"
+            : `Précisez les ${toReviewCount} produits restants`}
+        </button>
+        {onEditList && (
+          <button
+            type="button"
+            onClick={onEditList}
+            aria-label="Modifier ma liste — retour à la saisie"
+            className="px-4 py-3 rounded-lg border-2 border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--text)] transition-colors"
+          >
+            Modifier ma liste
+          </button>
+        )}
+      </div>
     </section>
   );
 }
@@ -65,13 +96,6 @@ interface ClarificationItemProps {
   onRemove?: () => void;
 }
 
-/**
- * Item de clarification avec triple fallback pour l'utilisateur :
- * 1. Boutons de suggestions (choix rapide)
- * 2. Champ texte libre "Autre réponse" (indispensable si dictée mal reconnue
- *    ou si aucune suggestion ne correspond)
- * 3. Bouton "Retirer" pour abandonner cet item
- */
 function ClarificationItem({
   item,
   index,
@@ -81,21 +105,9 @@ function ClarificationItem({
 }: ClarificationItemProps) {
   const [customValue, setCustomValue] = useState("");
 
-  const statusLabel =
-    item.status === "clear"
-      ? "validé"
-      : item.status === "ambiguous"
-        ? "à préciser"
-        : "incompris";
-
-  const normalizedOriginal = item.originalText.trim().toLowerCase();
-  const normalizedQuery = (item.query || "").trim().toLowerCase();
-  const showQuery =
-    item.status === "clear" &&
-    item.query &&
-    normalizedQuery !== normalizedOriginal;
-
-  const clearItemLabel = `Article ${index + 1} sur ${total}, ${item.originalText}, ${statusLabel}${showQuery ? `, recherche : ${item.query}` : ""}`;
+  // Label concis pour items validés : pas besoin du détail de la query
+  // technique ("lait demi écreme 1L"). L'utilisateur veut savoir que c'est OK.
+  const clearItemLabel = `Article ${index + 1} sur ${total}, ${item.originalText}, validé`;
 
   const borderClass =
     item.status === "clear"
@@ -143,11 +155,8 @@ function ClarificationItem({
         </span>
         <div className="flex-1">
           <div className="font-semibold">{item.originalText}</div>
-          {showQuery && (
-            <div className="text-sm text-[var(--text-muted)]">
-              Recherche : {item.query}
-            </div>
-          )}
+          {/* On n'affiche plus "recherche : X" : c'est une info technique
+              qui pollue l'aria-label et n'aide ni voyants ni non-voyants. */}
           {item.clarificationQuestion && (
             <div className="mt-2 font-medium" id={clarifId}>
               {item.clarificationQuestion}
@@ -181,13 +190,10 @@ function ClarificationItem({
             </div>
           )}
 
-          {/* Champ libre — ESCAPE HATCH critique pour la dictée.
-              Si SpeechRecognition a mal reconnu, les suggestions sont
-              forcément fausses. L'utilisateur doit pouvoir corriger en texte. */}
           {item.status !== "clear" && (
             <form
               onSubmit={handleCustomSubmit}
-              className="flex gap-2 mt-3"
+              className="flex gap-2 mt-3 flex-wrap"
               aria-label={`Correction libre pour ${item.originalText}`}
             >
               <label htmlFor={customInputId} className="sr-only">
@@ -199,7 +205,7 @@ function ClarificationItem({
                 value={customValue}
                 onChange={(e) => setCustomValue(e.target.value)}
                 placeholder="Autre réponse…"
-                className="flex-1 px-3 py-2 rounded border-2 border-[var(--border)] bg-[var(--bg)] text-[var(--text)] text-sm focus:border-[var(--accent)]"
+                className="flex-1 min-w-[10rem] px-3 py-2 rounded border-2 border-[var(--border)] bg-[var(--bg)] text-[var(--text)] text-sm focus:border-[var(--accent)]"
               />
               <button
                 type="submit"

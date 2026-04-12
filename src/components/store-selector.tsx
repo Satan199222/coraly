@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CarrefourStore } from "@/lib/carrefour/types";
 
 interface StoreSelectorProps {
@@ -14,6 +14,18 @@ export function StoreSelector({ onStoreSelected }: StoreSelectorProps) {
   const [selectingRef, setSelectingRef] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [postalError, setPostalError] = useState<string | null>(null);
+  const firstStoreRef = useRef<HTMLButtonElement>(null);
+  const justSearchedRef = useRef(false);
+
+  // Après une recherche aboutie, envoyer le focus sur le 1er magasin trouvé :
+  // un utilisateur clavier sait immédiatement qu'il peut choisir sans tabber
+  // à travers tout le form.
+  useEffect(() => {
+    if (justSearchedRef.current && stores.length > 0) {
+      justSearchedRef.current = false;
+      setTimeout(() => firstStoreRef.current?.focus(), 50);
+    }
+  }, [stores]);
 
   function validatePostalCode(value: string): string | null {
     if (!value.trim()) return null;
@@ -47,6 +59,7 @@ export function StoreSelector({ onStoreSelected }: StoreSelectorProps) {
       } else {
         const data = await res.json();
         setStores(data.stores || []);
+        justSearchedRef.current = true;
         if ((data.stores || []).length === 0) {
           setError("Aucun magasin Carrefour trouvé pour ce code postal");
         }
@@ -76,7 +89,7 @@ export function StoreSelector({ onStoreSelected }: StoreSelectorProps) {
 
   return (
     <section aria-label="Choix du magasin">
-      <h2 className="text-2xl font-bold mb-2">Choisir votre magasin</h2>
+      <h3 className="text-2xl font-bold mb-2">Choisir votre magasin</h3>
       <p className="text-[var(--text-muted)] mb-4">
         Entrez votre code postal pour trouver les magasins Carrefour proches.
       </p>
@@ -134,20 +147,28 @@ export function StoreSelector({ onStoreSelected }: StoreSelectorProps) {
       )}
 
       {stores.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold mb-3">
+        <div
+          role="region"
+          aria-label={`${stores.length} magasin${stores.length > 1 ? "s" : ""} trouvé${stores.length > 1 ? "s" : ""}`}
+        >
+          {/* aria-live sur le heading : annonce du résultat dès son apparition */}
+          <h4
+            className="text-lg font-semibold mb-3"
+            aria-live="polite"
+          >
             {stores.length} magasin{stores.length > 1 ? "s" : ""} trouvé
-            {stores.length > 1 ? "s" : ""} :
-          </h3>
+            {stores.length > 1 ? "s" : ""}&nbsp;:
+          </h4>
           <ul role="list" className="space-y-3">
-            {stores.map((store) => (
+            {stores.map((store, i) => (
               <li key={store.ref}>
                 <button
+                  ref={i === 0 ? firstStoreRef : undefined}
                   type="button"
                   onClick={() => handleSelect(store)}
                   disabled={selectingRef !== null}
                   aria-pressed={selectingRef === store.ref}
-                  aria-label={`Choisir ${store.name}, ${store.format}, à ${store.distance} kilomètres`}
+                  aria-label={`Choisir ${store.name}, ${store.format}, à ${store.distance} kilomètres. ${i + 1} sur ${stores.length}.`}
                   className="w-full flex items-center justify-between gap-4 p-4 rounded-lg border-2 border-[var(--border)] bg-[var(--bg-surface)] text-left hover:border-[var(--accent)] disabled:opacity-50 transition-colors"
                 >
                   <div>
