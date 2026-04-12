@@ -6,7 +6,9 @@
  * - Liste présente : affiche le détail complet + ouvre Carrefour ou supprime
  */
 
-const WEB_APP_URL = "https://voixcourses.fr";
+// URL canonique de l'app web. Pour l'instant voixcourses.vercel.app (MVP),
+// remplacer par https://voixcourses.fr quand le domaine sera configuré.
+const WEB_APP_URL = "https://voixcourses.vercel.app";
 
 function el(tag, options = {}) {
   const e = document.createElement(tag);

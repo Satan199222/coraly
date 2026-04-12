@@ -13,3 +13,4 @@ extension.pem
 *.crx
 *.pem
 .vercel
+voixcourses-extension-*.zip

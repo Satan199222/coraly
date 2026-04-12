@@ -192,7 +192,7 @@ function DevInstallProcedure({ browser }: { browser: BrowserInfo }) {
         <ol className="space-y-3 text-base list-decimal list-inside">
           <li>
             <a
-              href="https://github.com/voixcourses/extension/releases/latest"
+              href="https://github.com/Satan199222/voixcourses/releases/latest"
               target="_blank"
               rel="noopener noreferrer"
               className="underline text-[var(--accent)]"
@@ -222,7 +222,7 @@ function DevInstallProcedure({ browser }: { browser: BrowserInfo }) {
         <ol className="space-y-3 text-base list-decimal list-inside">
           <li>
             <a
-              href="https://github.com/voixcourses/extension/releases/latest"
+              href="https://github.com/Satan199222/voixcourses/releases/latest"
               target="_blank"
               rel="noopener noreferrer"
               className="underline text-[var(--accent)]"
@@ -272,8 +272,9 @@ function PrivacySection() {
       <h2 className="text-lg font-bold mb-2">🔐 Confidentialité</h2>
       <ul className="text-sm text-[var(--text-muted)] space-y-1 list-disc list-inside">
         <li>
-          L&apos;extension n&apos;accède qu&apos;à <code>carrefour.fr</code> et{" "}
-          <code>voixcourses.fr</code>. Aucun autre site.
+          L&apos;extension n&apos;accède qu&apos;à <code>carrefour.fr</code> et à
+          l&apos;app VoixCourses (<code>voixcourses.vercel.app</code>). Aucun
+          autre site.
         </li>
         <li>
           Vos identifiants Carrefour ne transitent <strong>jamais</strong> par
