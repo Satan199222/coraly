@@ -9,14 +9,28 @@ let cloudflareReady = false;
  * - En production Vercel : @sparticuz/chromium (binaire optimisé Lambda)
  * - En local : Chromium installé par `npx playwright install chromium`
  */
+/**
+ * URL du pack Brotli de Chromium hébergé sur GitHub Releases.
+ *
+ * @sparticuz/chromium-min NE bundle PAS le binaire (différence avec `chromium`
+ * classique), car il dépasse la limite 50 MB des fonctions Vercel Hobby.
+ * À la place, on télécharge le pack.tar au premier cold start, décompressé
+ * dans /tmp. Fluid Compute réutilise ensuite l'instance → pas de redownload.
+ *
+ * Il faut que la MAJOR de cette URL corresponde à la version npm de
+ * @sparticuz/chromium-min (sinon incompatibilités).
+ */
+const CHROMIUM_PACK_URL =
+  "https://github.com/Sparticuz/chromium/releases/download/v147.0.0/chromium-v147.0.0-pack.x64.tar";
+
 async function getLaunchOptions() {
   const isVercel = !!process.env.VERCEL;
 
   if (isVercel) {
-    const chromium = await import("@sparticuz/chromium");
+    const chromium = await import("@sparticuz/chromium-min");
     return {
       args: chromium.default.args,
-      executablePath: await chromium.default.executablePath(),
+      executablePath: await chromium.default.executablePath(CHROMIUM_PACK_URL),
       headless: true,
     };
   }

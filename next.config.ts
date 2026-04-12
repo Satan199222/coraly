@@ -38,7 +38,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["playwright-core", "@sparticuz/chromium"],
+  serverExternalPackages: ["playwright-core", "@sparticuz/chromium-min"],
   turbopack: {
     root: __dirname,
   },
