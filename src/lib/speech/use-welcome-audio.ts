@@ -43,7 +43,9 @@ export function useWelcomeAudio({ voiceEnabled, speak }: UseWelcomeAudioOptions)
         playedRef.current = true;
         return;
       }
-    } catch { /* noop */ }
+    } catch (err) {
+      console.warn("[welcome] sessionStorage.getItem failed (private browsing?):", err);
+    }
 
     playedRef.current = true;
 

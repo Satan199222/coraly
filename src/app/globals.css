@@ -35,9 +35,10 @@
   --shadow-md: 0 4px 12px rgba(13, 27, 42, 0.06);
   --shadow-lg: 0 10px 28px rgba(13, 27, 42, 0.08);
 
-  /* Texte sur fond --accent-ink (panneaux foncés) — ne jamais utiliser
-     var(--bg) dans ce contexte : --bg devient sombre dans les thèmes sombre
-     et jaune-noir, rendant le texte invisible sur fond identique. */
+  /* Texte sur fond --accent-ink (panneaux foncés). Toujours utiliser ces tokens
+     plutôt que var(--bg) : --bg est redéfini dans chaque thème et peut devenir
+     sombre (voire identique à --accent-ink), rendant le texte invisible.
+     Chaque thème ci-dessous redéfinit ces trois valeurs en conséquence. */
   --text-on-ink:        #F4EEE3;
   --text-on-ink-muted:  rgba(244, 238, 227, 0.75);
   --text-on-ink-faint:  rgba(244, 238, 227, 0.35);
