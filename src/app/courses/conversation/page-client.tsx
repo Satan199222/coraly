@@ -10,6 +10,7 @@ import {
   useConversationClientTool,
 } from "@elevenlabs/react";
 import { AccessibilityBar } from "@/components/accessibility-bar";
+import { SiteHeader } from "@/components/site-header";
 import { LiveRegion } from "@/components/live-region";
 import { Footer } from "@/components/footer";
 import { InstallExtensionBanner } from "@/components/install-extension-banner";
@@ -67,6 +68,7 @@ export default function ConversationPageClient() {
   return (
     <>
       <AccessibilityBar />
+      <SiteHeader compact />
       <LiveRegion message={announce} />
       {error && <LiveRegion message={error} urgency="assertive" />}
 

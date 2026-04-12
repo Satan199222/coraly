@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { AccessibilityBar } from "@/components/accessibility-bar";
+import { SiteHeader } from "@/components/site-header";
+import { Footer } from "@/components/footer";
 import { useExtension } from "@/lib/extension/use-extension";
 import {
   detectBrowser,
@@ -27,22 +30,18 @@ export default function InstallerPage() {
   }, []);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
-      <header>
-        <Link
-          href="/"
-          className="text-[var(--accent)] underline text-sm"
-          aria-label="Retour à VoixCourses"
-        >
-          ← Retour à VoixCourses
-        </Link>
-        <h1 className="text-3xl font-bold mt-3">Installer l&apos;extension</h1>
-        <p className="text-[var(--text-muted)] mt-1 text-base">
-          L&apos;extension permet de remplir votre panier Carrefour en un clic,
-          directement dans votre session. Aucun identifiant ne transite par
-          VoixCourses.
-        </p>
-      </header>
+    <>
+      <AccessibilityBar />
+      <SiteHeader compact />
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
+        <header>
+          <h1 className="vc-h2 mt-3">Installer l&apos;extension</h1>
+          <p className="text-[var(--text-muted)] mt-1 text-base">
+            L&apos;extension permet de remplir votre panier Carrefour en un clic,
+            directement dans votre session. Aucun identifiant ne transite par
+            VoixCourses.
+          </p>
+        </header>
 
       {/* Statut — aria-live pour que l'utilisateur entende la détection.
           Bouton "Tester" pour vérifier activement que l'extension répond
@@ -61,6 +60,8 @@ export default function InstallerPage() {
         </>
       )}
     </div>
+      <Footer />
+    </>
   );
 }
 
