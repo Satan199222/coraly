@@ -77,23 +77,10 @@ body {
   color: var(--bg);
 }
 
-/* Respecter la préférence système si l'utilisateur n'a pas explicitement choisi
-   un thème. Le thème par défaut est sombre, mais on bascule en clair si
-   l'utilisateur a configuré son système en clair. */
-@media (prefers-color-scheme: light) {
-  body:not(.theme-light):not(.theme-high-contrast):not(.theme-dark) {
-    --bg: #ffffff;
-    --bg-surface: #f5f5f7;
-    --text: #1a1a2e;
-    --text-muted: #555566;
-    --accent: #0062cc;
-    --accent-hover: #004fa3;
-    --danger: #c41640;
-    --success: #0a7a52;
-    --border: #ccccdd;
-    --focus-ring: #e67700;
-  }
-}
+/* Note : on NE respecte PAS automatiquement prefers-color-scheme car
+   certains utilisateurs aveugles ont leur OS en clair par défaut mais
+   préfèrent le thème sombre de l'app (meilleur contraste pour le peu de
+   vue qu'ils ont). L'utilisateur choisit explicitement son thème. */
 
 /* Windows High Contrast Mode — utiliser les system colors plutôt que les nôtres.
    Ne pas redesigner, juste ajuster ce qui ne fonctionnerait pas. */
