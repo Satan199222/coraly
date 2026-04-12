@@ -13,11 +13,20 @@ const STORAGE_KEY = "voixcourses-pending-list";
  * - Nombre = nombre de produits en attente de transfert
  */
 function updateBadge(list) {
-  if (list && Array.isArray(list.eans) && list.eans.length > 0) {
-    chrome.action.setBadgeText({ text: String(list.eans.length) });
+  // Compter soit via items[] (nouveau format) soit via eans[] (legacy)
+  const count = list
+    ? Array.isArray(list.items)
+      ? list.items.length
+      : Array.isArray(list.eans)
+        ? list.eans.length
+        : 0
+    : 0;
+
+  if (count > 0) {
+    chrome.action.setBadgeText({ text: String(count) });
     chrome.action.setBadgeBackgroundColor({ color: "#4cc9f0" });
     chrome.action.setTitle({
-      title: `VoixCourses — ${list.eans.length} produit${list.eans.length > 1 ? "s" : ""} en attente. Cliquez pour ouvrir Carrefour.`,
+      title: `VoixCourses — ${count} produit${count > 1 ? "s" : ""} en attente. Cliquez pour ouvrir Carrefour.`,
     });
   } else {
     chrome.action.setBadgeText({ text: "" });
@@ -56,27 +65,41 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
   }
 
   if (message.type === "SET_LIST") {
-    const { storeRef, basketServiceId, eans, title } = message.payload || {};
-    if (!storeRef || !basketServiceId || !Array.isArray(eans) || eans.length === 0) {
+    const { storeRef, basketServiceId, items, eans, title } =
+      message.payload || {};
+
+    // Accepte `items: [{ean, quantity}]` (nouveau) OU `eans: [...]` (legacy)
+    const normalizedItems = Array.isArray(items)
+      ? items
+      : Array.isArray(eans)
+        ? eans.map((ean) => ({ ean, quantity: 1 }))
+        : null;
+
+    if (
+      !storeRef ||
+      !basketServiceId ||
+      !normalizedItems ||
+      normalizedItems.length === 0
+    ) {
       sendResponse({ error: "Payload invalide" });
       return;
     }
 
+    const count = normalizedItems.length;
     const list = {
       storeRef,
       basketServiceId,
-      eans,
-      title: title || `${eans.length} produit${eans.length > 1 ? "s" : ""}`,
+      items: normalizedItems,
+      title: title || `${count} produit${count > 1 ? "s" : ""}`,
       createdAt: Date.now(),
     };
 
     chrome.storage.local.set({ [STORAGE_KEY]: list }, () => {
-      // Ouvrir carrefour.fr dans un nouvel onglet
       chrome.tabs.create({ url: "https://www.carrefour.fr/" }, (tab) => {
         sendResponse({
           ok: true,
           tabId: tab?.id,
-          itemCount: eans.length,
+          itemCount: count,
         });
       });
     });

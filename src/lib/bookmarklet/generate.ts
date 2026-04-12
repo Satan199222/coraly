@@ -13,7 +13,9 @@
 export interface BookmarkletPayload {
   storeRef: string;
   basketServiceId: string;
-  eans: string[];
+  /** Items avec quantité par EAN. Rétrocompat : si eans[] est fourni, quantity=1. */
+  items?: Array<{ ean: string; quantity: number }>;
+  eans?: string[];
 }
 
 /**
@@ -21,27 +23,43 @@ export interface BookmarkletPayload {
  * Note : pageType DOIT être "productdetail" — l'API Carrefour valide cette valeur.
  */
 export function generateBookmarklet(payload: BookmarkletPayload): string {
-  // JSON compact (pas d'espaces superflus) pour raccourcir l'URL
-  const data = JSON.stringify(payload);
+  // Normalise: toujours envoyer `items` au runtime, même si l'appelant donne eans[]
+  const items =
+    payload.items ??
+    (payload.eans ?? []).map((ean) => ({ ean, quantity: 1 }));
 
-  const code = `(async()=>{const D=${data};try{await fetch('/set-store/'+D.storeRef,{headers:{'x-requested-with':'XMLHttpRequest'}});for(const e of D.eans){await fetch('/api/cart',{method:'PATCH',headers:{'x-requested-with':'XMLHttpRequest','content-type':'application/json'},body:JSON.stringify({trackingRequest:{pageType:'productdetail',pageId:'productdetail'},items:[{basketServiceId:D.basketServiceId,counter:1,ean:e,subBasketType:'drive_clcv'}]})})}location.href='/mon-panier'}catch(err){alert('Erreur VoixCourses: '+err.message)}})();`;
+  const data = JSON.stringify({
+    storeRef: payload.storeRef,
+    basketServiceId: payload.basketServiceId,
+    items,
+  });
+
+  const code = `(async()=>{const D=${data};try{await fetch('/set-store/'+D.storeRef,{headers:{'x-requested-with':'XMLHttpRequest'}});for(const it of D.items){await fetch('/api/cart',{method:'PATCH',headers:{'x-requested-with':'XMLHttpRequest','content-type':'application/json'},body:JSON.stringify({trackingRequest:{pageType:'productdetail',pageId:'productdetail'},items:[{basketServiceId:D.basketServiceId,counter:it.quantity||1,ean:it.ean,subBasketType:'drive_clcv'}]})})}location.href='/cart/driveclcv'}catch(err){alert('Erreur VoixCourses: '+err.message)}})();`;
 
   return `javascript:${encodeURIComponent(code)}`;
 }
 
 /**
- * Version lisible du script (sans minification) — utile pour debug ou
- * afficher à l'utilisateur ce que le bookmarklet va faire.
+ * Version lisible du script — utile pour debug ou afficher à l'utilisateur
+ * ce que le bookmarklet va faire.
  */
 export function generateReadableScript(payload: BookmarkletPayload): string {
+  const items =
+    payload.items ??
+    (payload.eans ?? []).map((ean) => ({ ean, quantity: 1 }));
+  const dataForDisplay = {
+    storeRef: payload.storeRef,
+    basketServiceId: payload.basketServiceId,
+    items,
+  };
   return `(async () => {
-  const DATA = ${JSON.stringify(payload, null, 2)};
+  const DATA = ${JSON.stringify(dataForDisplay, null, 2)};
   // 1. Sélectionner le même magasin que VoixCourses
   await fetch('/set-store/' + DATA.storeRef, {
     headers: { 'x-requested-with': 'XMLHttpRequest' }
   });
-  // 2. Ajouter chaque produit
-  for (const ean of DATA.eans) {
+  // 2. Ajouter chaque produit avec sa quantité
+  for (const it of DATA.items) {
     await fetch('/api/cart', {
       method: 'PATCH',
       headers: {
@@ -52,14 +70,14 @@ export function generateReadableScript(payload: BookmarkletPayload): string {
         trackingRequest: { pageType: 'productdetail', pageId: 'productdetail' },
         items: [{
           basketServiceId: DATA.basketServiceId,
-          counter: 1,
-          ean,
+          counter: it.quantity || 1,
+          ean: it.ean,
           subBasketType: 'drive_clcv'
         }]
       })
     });
   }
-  // 3. Rediriger vers le panier
-  location.href = '/mon-panier';
+  // 3. Rediriger vers le panier Drive
+  location.href = '/cart/driveclcv';
 })();`;
 }

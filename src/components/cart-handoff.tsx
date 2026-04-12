@@ -44,7 +44,7 @@ export function CartHandoff({
   const payload: BookmarkletPayload = {
     storeRef,
     basketServiceId,
-    eans: cart.items.map((i) => i.ean),
+    items: cart.items.map((i) => ({ ean: i.ean, quantity: i.quantity || 1 })),
   };
   const bookmarkletUrl = generateBookmarklet(payload);
 
@@ -56,7 +56,10 @@ export function CartHandoff({
     const result = await sendListToExtension(extension.extensionId, {
       storeRef,
       basketServiceId,
-      eans: cart!.items.map((i) => i.ean),
+      items: cart!.items.map((i) => ({
+        ean: i.ean,
+        quantity: i.quantity || 1,
+      })),
       title: `${cart!.items.length} produit${cart!.items.length > 1 ? "s" : ""} · ${cart!.totalAmount.toFixed(2)}€`,
     });
 

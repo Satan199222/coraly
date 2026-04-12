@@ -121,7 +121,17 @@ async function removeFromCart(basketServiceId, ean) {
 }
 
 /**
- * Remplir le panier Carrefour avec les EAN fournis.
+ * Normaliser la liste en format { ean, quantity } — support legacy eans[].
+ */
+function getItems(list) {
+  if (Array.isArray(list.items)) return list.items;
+  if (Array.isArray(list.eans))
+    return list.eans.map((ean) => ({ ean, quantity: 1 }));
+  return [];
+}
+
+/**
+ * Remplir le panier Carrefour avec les items fournis (ean + quantity).
  * S'exécute dans la session utilisateur (mêmes cookies que la page).
  */
 async function fillCart(list) {
@@ -136,9 +146,11 @@ async function fillCart(list) {
 
   const failures = [];
   let lastTotal = 0;
+  const items = getItems(list);
 
-  // 2. Ajouter chaque produit
-  for (const ean of list.eans) {
+  // 2. Ajouter chaque produit avec sa quantité demandée
+  for (const item of items) {
+    const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
     try {
       const res = await fetch("/api/cart", {
         method: "PATCH",
@@ -156,8 +168,8 @@ async function fillCart(list) {
           items: [
             {
               basketServiceId: list.basketServiceId,
-              counter: 1,
-              ean,
+              counter: quantity,
+              ean: item.ean,
               subBasketType: "drive_clcv",
             },
           ],
@@ -165,14 +177,14 @@ async function fillCart(list) {
       });
 
       if (!res.ok) {
-        failures.push(ean);
+        failures.push(item.ean);
         continue;
       }
 
       const data = await res.json();
       lastTotal = data?.cart?.totalAmount ?? lastTotal;
     } catch {
-      failures.push(ean);
+      failures.push(item.ean);
     }
   }
 
@@ -289,7 +301,8 @@ async function showBanner(list) {
     style: "display:flex;gap:12px;align-items:center;flex-wrap:wrap",
   });
 
-  const itemCount = list.eans.length;
+  const listItems = getItems(list);
+  const itemCount = listItems.length;
 
   // Bouton principal : ajoute à l'existant
   const fillBtn = el("button", {

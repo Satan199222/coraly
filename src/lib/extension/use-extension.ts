@@ -66,7 +66,8 @@ export async function sendListToExtension(
   payload: {
     storeRef: string;
     basketServiceId: string;
-    eans: string[];
+    /** Liste des produits avec leurs quantités. */
+    items: Array<{ ean: string; quantity: number }>;
     title?: string;
   }
 ): Promise<{ ok: boolean; error?: string; itemCount?: number }> {

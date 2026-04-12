@@ -29,6 +29,8 @@ interface MatchedItem {
   allCandidates: CarrefourProduct[];
   /** Index du produit actuel dans allCandidates (pour annoncer "1 sur 4") */
   currentIndex: number;
+  /** Quantité demandée (default 1). Si 0, l'item est supprimé. */
+  quantity: number;
 }
 
 export default function Home() {
@@ -181,13 +183,15 @@ export default function Home() {
     try {
       const matched: MatchedItem[] = await Promise.all(
         items.map(async (item) => {
+          // Tenter d'extraire la quantité souhaitée depuis le texte original
+          // (ex: "2 litres de lait" → quantity=2, "6 yaourts" → quantity=6)
+          const initialQuantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
           try {
             const searchRes = await fetch(
               `/api/search?q=${encodeURIComponent(item.query)}`
             );
             const searchData = await searchRes.json();
             const products: CarrefourProduct[] = searchData.products || [];
-            // Garde jusqu'à 5 candidats : 1 principal + 4 alternatives
             const candidates = products.slice(0, 5);
             return {
               query: item.query,
@@ -195,6 +199,7 @@ export default function Home() {
               alternatives: candidates.slice(1),
               allCandidates: candidates,
               currentIndex: 0,
+              quantity: initialQuantity,
             };
           } catch {
             return {
@@ -203,6 +208,7 @@ export default function Home() {
               alternatives: [],
               allCandidates: [],
               currentIndex: 0,
+              quantity: initialQuantity,
             };
           }
         })
@@ -270,22 +276,61 @@ export default function Home() {
     );
   }
 
-  function handleRemove(query: string) {
-    // Retrouver l'EAN associé à cette query AVANT de filtrer, pour pouvoir
-    // le retirer de confirmedEans.
-    const removedEan = matchedItems.find((item) => item.query === query)
-      ?.product?.ean;
+  /**
+   * Augmente la quantité d'un produit. Annonce le changement.
+   */
+  function handleIncrement(query: string) {
+    setMatchedItems((prev) =>
+      prev.map((item) => {
+        if (item.query !== query) return item;
+        const newQty = item.quantity + 1;
+        if (item.product) {
+          announce(
+            `Quantité ${newQty} de ${item.product.title}.`
+          );
+        }
+        return { ...item, quantity: newQty };
+      })
+    );
+  }
 
-    setMatchedItems((prev) => prev.filter((item) => item.query !== query));
+  /**
+   * Diminue la quantité d'un produit. À 0, l'item est supprimé de la liste.
+   */
+  function handleDecrement(query: string) {
+    const item = matchedItems.find((i) => i.query === query);
+    if (!item) return;
 
-    if (removedEan) {
-      setConfirmedEans((prev) => {
-        const next = new Set(prev);
-        next.delete(removedEan);
-        return next;
-      });
+    if (item.quantity <= 1) {
+      // Décrémenter depuis 1 → suppression
+      const removedEan = item.product?.ean;
+      setMatchedItems((prev) => prev.filter((i) => i.query !== query));
+      if (removedEan) {
+        setConfirmedEans((prev) => {
+          const next = new Set(prev);
+          next.delete(removedEan);
+          return next;
+        });
+      }
+      announce(
+        item.product
+          ? `${item.product.title} retiré de la liste.`
+          : "Produit retiré de la liste."
+      );
+      return;
     }
-    announce(`Produit retiré de la liste.`);
+
+    // Décrémenter de N vers N-1
+    setMatchedItems((prev) =>
+      prev.map((i) => {
+        if (i.query !== query) return i;
+        const newQty = i.quantity - 1;
+        if (i.product) {
+          announce(`Quantité ${newQty} de ${i.product.title}.`);
+        }
+        return { ...i, quantity: newQty };
+      })
+    );
   }
 
   // ── Add a single product from results page ─────────────────────────────────
@@ -309,6 +354,7 @@ export default function Home() {
           alternatives: candidates.slice(1),
           allCandidates: candidates,
           currentIndex: 0,
+          quantity: 1,
         },
       ]);
       setAddQuery("");
@@ -334,25 +380,25 @@ export default function Home() {
       return;
     }
 
-    const confirmedProducts = matchedItems
-      .filter((m) => m.product && confirmedEans.has(m.product.ean))
-      .map((m) => m.product!);
+    const confirmedItems = matchedItems.filter(
+      (m) => m.product && confirmedEans.has(m.product.ean) && m.quantity > 0
+    );
 
-    const totalAmount = confirmedProducts.reduce(
-      (sum, p) => sum + (p.price ?? 0),
+    const totalAmount = confirmedItems.reduce(
+      (sum, m) => sum + (m.product!.price ?? 0) * m.quantity,
       0
     );
 
     const virtualCart: Cart = {
       totalAmount,
       totalFees: 0,
-      items: confirmedProducts.map((p) => ({
-        ean: p.ean,
-        title: p.title,
-        brand: p.brand,
-        quantity: 1,
-        price: p.price ?? 0,
-        available: p.purchasable,
+      items: confirmedItems.map((m) => ({
+        ean: m.product!.ean,
+        title: m.product!.title,
+        brand: m.product!.brand,
+        quantity: m.quantity,
+        price: (m.product!.price ?? 0) * m.quantity,
+        available: m.product!.purchasable,
       })),
     };
 
@@ -360,7 +406,7 @@ export default function Home() {
     setStep("cart");
 
     announce(
-      `Liste prête. ${confirmedProducts.length} produit(s) pour ${totalAmount.toFixed(2).replace(".", " euros ")}. Copiez le lien magique et collez-le sur carrefour.fr pour remplir votre panier.`
+      `Liste prête. ${confirmedItems.length} produit(s) pour ${totalAmount.toFixed(2).replace(".", " euros ")}. Copiez le lien magique et collez-le sur carrefour.fr pour remplir votre panier.`
     );
   }
 
@@ -457,7 +503,8 @@ export default function Home() {
               items={matchedItems}
               onConfirm={handleConfirm}
               onReject={handleReject}
-              onRemove={handleRemove}
+              onIncrement={handleIncrement}
+              onDecrement={handleDecrement}
               confirmedEans={confirmedEans}
             />
 
