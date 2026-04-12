@@ -1,4 +1,14 @@
 import { browserFetch, getPage } from "./browser";
+import {
+  SearchResponseSchema,
+  GeolocResponseSchema,
+  CartRawSchema,
+  SlotResponseSchema,
+  safeParse,
+  type ProductRaw,
+  type StoreRaw,
+  type CartRaw,
+} from "./schemas";
 import type {
   CarrefourProduct,
   SearchResult,
@@ -9,67 +19,82 @@ import type {
 } from "./types";
 
 /**
- * Extraire un CarrefourProduct depuis la réponse JSON:API brute.
- * Ref: docs/CARREFOUR-API.md § "Structure Product"
+ * Extrait un CarrefourProduct depuis la réponse JSON:API validée.
+ * Les offers sont indexées par EAN — on prend la première entrée qui a
+ * des attributs (il y en a généralement 1 seule par produit/magasin).
  */
-function extractProduct(raw: any): CarrefourProduct {
+function extractProduct(raw: ProductRaw): CarrefourProduct {
   const a = raw.attributes;
-  const ean: string = a.ean;
-  const offers = a.offers?.[ean] || {};
-  const [offerServiceId, offerData] = Object.entries(offers)[0] || [
-    null,
-    null,
-  ];
-  const offer = (offerData as any)?.attributes;
+  const ean = a.ean;
+  const offersForEan = a.offers?.[ean] ?? {};
+  const firstOffer = Object.entries(offersForEan)[0];
+  const offerAttrs = firstOffer?.[1]?.attributes;
 
   return {
     ean,
     title: a.title,
     brand: a.brand,
     slug: a.slug,
-    price: offer?.price?.price ?? null,
-    perUnitLabel: offer?.price?.perUnitLabel ?? null,
-    unitOfMeasure: offer?.price?.unitOfMeasure ?? null,
-    purchasable: offer?.availability?.purchasable ?? false,
+    price: offerAttrs?.price?.price ?? null,
+    perUnitLabel: offerAttrs?.price?.perUnitLabel ?? null,
+    unitOfMeasure: offerAttrs?.price?.unitOfMeasure ?? null,
+    purchasable: offerAttrs?.availability?.purchasable ?? false,
     nutriscore: a.nutriscore?.value ?? null,
     format: a.format ?? null,
     packaging: a.packaging ?? null,
-    categories: a.categories?.map((c: any) => c.label) ?? [],
+    categories: (a.categories ?? []).map((c) => c.label),
     imageUrl: a.images?.main ?? null,
-    offerServiceId: offerServiceId as string | null,
+    offerServiceId: firstOffer?.[0] ?? null,
   };
 }
 
-function parseCartResponse(data: any): Cart {
-  const cart = data.cart || {};
+function parseCartResponse(raw: CartRaw): Cart {
+  const cart = raw.cart;
   const items: CartItem[] = [];
-  for (const category of cart.items || []) {
-    for (const p of category.products || []) {
+  for (const category of cart?.items ?? []) {
+    for (const p of category.products ?? []) {
+      const attrs = p.product?.attributes;
       items.push({
-        ean: p.product?.attributes?.ean ?? "",
-        title: p.product?.attributes?.title ?? "",
-        brand: p.product?.attributes?.brand ?? "",
-        quantity: p.counter ?? 0,
-        price: p.totalItemPrice ?? 0,
-        available: p.available ?? true,
+        ean: attrs?.ean ?? "",
+        title: attrs?.title ?? "",
+        brand: attrs?.brand ?? "",
+        quantity: p.counter,
+        price: p.totalItemPrice,
+        available: p.available,
       });
     }
   }
   return {
-    totalAmount: cart.totalAmount ?? 0,
-    totalFees: cart.totalFees ?? 0,
+    totalAmount: cart?.totalAmount ?? 0,
+    totalFees: cart?.totalFees ?? 0,
     items,
+  };
+}
+
+function extractStore(raw: StoreRaw): CarrefourStore {
+  return {
+    ref: raw.ref,
+    name: raw.name,
+    format: raw.format,
+    distance: raw.distance,
+    isDrive: raw.isDrive,
+    isDelivery: raw.isLad,
+    address: raw.address,
   };
 }
 
 /** Recherche produits. Ref: GET /s?q={query} */
 export async function searchProducts(query: string): Promise<SearchResult> {
   const params = new URLSearchParams({ q: query });
-  const data = await browserFetch<any>(`/s?${params}`);
+  const raw = await browserFetch<unknown>(`/s?${params}`);
+  const parsed = safeParse(SearchResponseSchema, raw, "search");
+  if (!parsed) {
+    return { products: [], total: 0, keyword: query };
+  }
   return {
-    products: (data.data || []).map(extractProduct),
-    total: data.meta?.total ?? 0,
-    keyword: data.meta?.keyword ?? query,
+    products: (parsed.data ?? []).map(extractProduct),
+    total: parsed.meta?.total ?? 0,
+    keyword: parsed.meta?.keyword ?? query,
   };
 }
 
@@ -90,21 +115,15 @@ export async function findStores(
   params.append("modes[]", "delivery");
   params.append("modes[]", "picking");
 
-  const data = await browserFetch<any>(`/geoloc?${params}`);
-  return (data.data?.stores || []).map((s: any) => ({
-    ref: s.ref,
-    name: s.name,
-    format: s.format,
-    distance: s.distance,
-    isDrive: s.isDrive,
-    isDelivery: s.isLad,
-    address: s.address,
-  }));
+  const raw = await browserFetch<unknown>(`/geoloc?${params}`);
+  const parsed = safeParse(GeolocResponseSchema, raw, "geoloc");
+  if (!parsed) return [];
+  return (parsed.data?.stores ?? []).map(extractStore);
 }
 
 /** Sélectionner un magasin. Ref: GET /set-store/{ref} */
 export async function setStore(storeRef: string): Promise<void> {
-  await browserFetch<any>(`/set-store/${storeRef}`);
+  await browserFetch<unknown>(`/set-store/${storeRef}`);
 }
 
 /**
@@ -129,8 +148,10 @@ export async function getBasketServiceId(
 
 /** Lire le panier. Ref: GET /api/cart */
 export async function getCart(): Promise<Cart> {
-  const data = await browserFetch<any>("/api/cart");
-  return parseCartResponse(data);
+  const raw = await browserFetch<unknown>("/api/cart");
+  const parsed = safeParse(CartRawSchema, raw, "cart");
+  if (!parsed) return { totalAmount: 0, totalFees: 0, items: [] };
+  return parseCartResponse(parsed);
 }
 
 /**
@@ -153,27 +174,30 @@ export async function addToCart(
       },
     ],
   });
-  const data = await browserFetch<any>("/api/cart", {
+  const raw = await browserFetch<unknown>("/api/cart", {
     method: "PATCH",
     body,
     headers: { "content-type": "application/json" },
   });
-  return parseCartResponse(data);
+  const parsed = safeParse(CartRawSchema, raw, "cart:patch");
+  if (!parsed) return { totalAmount: 0, totalFees: 0, items: [] };
+  return parseCartResponse(parsed);
 }
 
 /** Premier créneau dispo. Ref: GET /api/firstslot */
 export async function getFirstSlot(
   storeRef: string
 ): Promise<DeliverySlot | null> {
-  const data = await browserFetch<any>(
+  const raw = await browserFetch<unknown>(
     `/api/firstslot?storeId=${storeRef}`
   );
-  if (Array.isArray(data) && data.length === 0) return null;
-  if (data?.data?.attributes) {
-    return {
-      begDate: data.data.attributes.begDate,
-      endDate: data.data.attributes.endDate,
-    };
-  }
-  return null;
+  const parsed = safeParse(SlotResponseSchema, raw, "slot");
+  // Réponse [] = pas de créneau dispo
+  if (!parsed || Array.isArray(parsed)) return null;
+  const attrs = parsed.data?.attributes;
+  if (!attrs) return null;
+  return {
+    begDate: attrs.begDate,
+    endDate: attrs.endDate,
+  };
 }
