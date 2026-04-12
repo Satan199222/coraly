@@ -12,3 +12,4 @@ extension.crx
 extension.pem
 *.crx
 *.pem
+.vercel
