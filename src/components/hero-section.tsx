@@ -66,7 +66,7 @@ export function HeroSection({ onListenDemo }: HeroSectionProps = {}) {
         <div
           role="region"
           className="relative p-12 rounded-2xl overflow-hidden"
-          style={{ background: "var(--accent-ink)", color: "var(--bg)" }}
+          style={{ background: "var(--accent-ink)", color: "var(--text-on-ink)" }}
           aria-label="Démonstration de Koraly"
         >
           <div
@@ -91,7 +91,7 @@ export function HeroSection({ onListenDemo }: HeroSectionProps = {}) {
             <p className="text-[17px] leading-[1.5] italic max-w-[380px]">
               « Bonjour, je suis Koraly. Dites-moi ce dont vous avez besoin. »
             </p>
-            <p className="text-[15px]" style={{ color: "rgba(244,238,227,0.7)" }}>
+            <p className="text-[15px]" style={{ color: "var(--text-on-ink-muted)" }}>
               <strong style={{ color: "var(--bg)", fontWeight: 700, fontStyle: "normal" }}>
                 Vous :
               </strong>{" "}
@@ -101,7 +101,7 @@ export function HeroSection({ onListenDemo }: HeroSectionProps = {}) {
               type="button"
               onClick={onListenDemo}
               className="mt-2 px-4 py-2 rounded-md border-[1.5px] font-bold text-sm inline-flex items-center gap-2"
-              style={{ borderColor: "var(--brass)", color: "var(--bg)" }}
+              style={{ borderColor: "var(--brass)", color: "var(--text-on-ink)" }}
             >
               ▶ Écouter la voix de Koraly
             </button>

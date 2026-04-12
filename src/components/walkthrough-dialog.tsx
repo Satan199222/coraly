@@ -43,13 +43,13 @@ function Bubble({
       className="px-6 py-5 rounded-xl text-[17px] leading-[1.55] max-w-[85%]"
       style={{
         background: isK ? "var(--accent-ink)" : "var(--bg-alt)",
-        color: isK ? "var(--bg)" : "var(--text)",
+        color: isK ? "var(--text-on-ink)" : "var(--text)",
         borderRadius: isK ? "12px 12px 12px 2px" : "12px 12px 2px 12px",
         alignSelf: isK ? "flex-start" : "flex-end",
         justifySelf: isK ? "start" : "end",
       }}
     >
-      <div className="vc-micro mb-1.5" style={{ color: isK ? "var(--brass)" : "var(--accent)" }}>
+      <div className="vc-micro mb-1.5" style={{ color: isK ? "var(--brass)" : "var(--text-muted)" }}>
         {who}
       </div>
       {children}
