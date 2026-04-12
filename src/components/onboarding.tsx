@@ -13,6 +13,7 @@ export function Onboarding() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture one-shot localStorage au mount (pas accessible en SSR)
     if (!localStorage.getItem(SEEN_KEY)) setShow(true);
   }, []);
 

@@ -72,7 +72,6 @@ export function useSpeech(options: UseSpeechOptions = {}): UseSpeechReturn {
     setTranscript("");
     playBeep("start");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechRecognitionCtor =
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -94,7 +93,8 @@ export function useSpeech(options: UseSpeechOptions = {}): UseSpeechReturn {
       setIsListening(false);
       isListeningRef.current = false;
     };
-    recognition.onerror = () => {
+    recognition.onerror = (event: { error?: string }) => {
+      console.warn("[speech] recognition error:", event.error);
       setIsListening(false);
       isListeningRef.current = false;
     };
@@ -136,7 +136,8 @@ export function useSpeech(options: UseSpeechOptions = {}): UseSpeechReturn {
           setIsSpeaking(false);
           resolve();
         };
-        utterance.onerror = () => {
+        utterance.onerror = (event: { error?: string }) => {
+          console.warn("[speech] utterance error:", event.error);
           setIsSpeaking(false);
           resolve();
         };
@@ -199,15 +200,17 @@ export function useSpeech(options: UseSpeechOptions = {}): UseSpeechReturn {
             // Fallback natif si la lecture échoue (format non supporté, etc.)
             speakNative(text).then(resolve);
           };
-          audio.play().catch(() => {
+          audio.play().catch((err) => {
             // Autoplay policy : si aucune interaction user récente, play()
             // rejette. On tombe sur le fallback qui marchera au prochain speak.
+            console.warn("[speech] audio.play() autoplay bloqué:", err);
             setIsSpeaking(false);
             URL.revokeObjectURL(url);
             speakNative(text).then(resolve);
           });
         });
-      } catch {
+      } catch (err) {
+        console.error("[speech] speakPremium failed:", err);
         return speakNative(text);
       }
     },

@@ -30,6 +30,7 @@ export function useExtension(): ExtensionState {
     const marker = document.documentElement.dataset.voixcoursesExtension;
     const markerId = document.documentElement.dataset.voixcoursesExtensionId;
     if (marker) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture initiale d'état externe (DOM dataset posé avant React)
       setState({
         installed: true,
         version: marker,

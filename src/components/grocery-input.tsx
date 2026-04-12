@@ -70,7 +70,6 @@ export function GroceryInput({
       // Synchroniser le state du textarea avec le transcript reçu depuis le
       // hook de reconnaissance vocale — c'est un external state qui vient
       // d'ailleurs, il faut bien le recopier dans notre state ici.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setText((prev) => {
         // Concaténer si l'utilisateur avait déjà tapé quelque chose avant
         // de dicter — évite d'écraser un contenu manuel.
@@ -119,6 +118,7 @@ export function GroceryInput({
           utilisateurs qui naviguent au Tab y tombent immédiatement.
           Badge "ancienne" si > 7 jours : l'utilisateur peut préférer refaire. */}
       {lastOrder && (() => {
+        // eslint-disable-next-line react-hooks/purity -- date display only, pas de useMemo car non critique pour re-render
         const ageMs = Date.now() - new Date(lastOrder.at).getTime();
         const isOld = ageMs > 7 * 24 * 60 * 60 * 1000;
         return (

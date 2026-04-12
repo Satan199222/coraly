@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { THEME_INIT_SCRIPT } from "./theme-init";
+import { luciole } from "@/lib/fonts";
 
 export const metadata: Metadata = {
-  title: "VoixCourses — Assistant Courses Accessible",
+  title: "VoixCourses — Vos courses par la voix",
   description:
-    "Faites vos courses en ligne par la voix. Dictez votre liste, l'IA s'occupe du reste.",
+    "Faites vos courses en ligne par la voix. Dictez, Koraly compose votre panier. Accessible aux non-voyants, malvoyants et seniors.",
 };
 
 export default function RootLayout({
@@ -15,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" suppressHydrationWarning>
+    <html lang="fr" suppressHydrationWarning className={luciole.variable}>
       <body suppressHydrationWarning>
         <Script id="theme-init" strategy="beforeInteractive">
           {THEME_INIT_SCRIPT}
@@ -26,9 +27,7 @@ export default function RootLayout({
         >
           Aller au contenu principal
         </a>
-        <main id="main" tabIndex={-1}>
-          {children}
-        </main>
+        {children}
       </body>
     </html>
   );

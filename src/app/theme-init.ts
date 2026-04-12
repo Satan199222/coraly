@@ -1,25 +1,30 @@
 /**
- * Script inline pour appliquer le thème AVANT le premier paint.
- * Évite le FOWT (Flash of Wrong Theme) et le FOUT sur la taille de police.
+ * Script inline appliqué AVANT le premier paint pour éviter le FOWT
+ * (Flash of Wrong Theme) et le FOUT sur la taille de police.
  *
- * Par défaut (utilisateur qui n'a rien configuré) :
- * - thème sombre (meilleur confort pour les utilisateurs malvoyants sensibles
- *   à la luminosité)
- * - font-size "Grand" (1.3rem) — VoixCourses cible les utilisateurs
- *   non-voyants et malvoyants, la valeur normale (1.125rem) serait trop petite
- *   pour le cas d'usage primaire.
+ * Thème par défaut : clair (palette Marine éditorial, cream #F4EEE3).
+ * Taille par défaut : 18px (base accessible low vision, recommandation WCAG 2.2).
+ *
+ * Thèmes supportés : sombre, jaune-noir (DMLA), blanc-bleu (glaucome).
+ * Le thème "clair" est l'absence de classe.
+ *
+ * Migration des anciennes clés (dark, light, high-contrast, 1.3rem, 1.125rem)
+ * vers les nouveaux noms pour préserver le choix d'un utilisateur existant.
  */
 export const THEME_INIT_SCRIPT = `
 (function() {
   try {
     var t = localStorage.getItem('voixcourses-theme');
-    if (t === 'light' || t === 'high-contrast') {
+    var migration = { 'dark': 'sombre', 'high-contrast': 'jaune-noir', 'light': 'clair' };
+    if (migration[t]) { t = migration[t]; localStorage.setItem('voixcourses-theme', t); }
+    if (t === 'sombre' || t === 'jaune-noir' || t === 'blanc-bleu') {
       document.documentElement.classList.add('theme-' + t);
     }
-    var s = localStorage.getItem('voixcourses-font-size') || '1.3rem';
+    var s = localStorage.getItem('voixcourses-font-size') || '18px';
+    if (s === '1.3rem' || s === '1.125rem') { s = '18px'; localStorage.setItem('voixcourses-font-size', s); }
     document.documentElement.style.setProperty('--font-size-base', s);
     if (!localStorage.getItem('voixcourses-font-size')) {
-      localStorage.setItem('voixcourses-font-size', '1.3rem');
+      localStorage.setItem('voixcourses-font-size', '18px');
     }
   } catch (e) {}
 })();

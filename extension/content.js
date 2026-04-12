@@ -568,6 +568,7 @@ async function showBanner(list) {
     });
 
     // Détection substitutions après coup
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- addedUnexpected conservé pour usages futurs (logs debug)
     const { missing, addedUnexpected } = await detectSubstitutions(
       list,
       mode === "replace" ? [] : initialEans

@@ -10,6 +10,7 @@ import {
   useConversationClientTool,
 } from "@elevenlabs/react";
 import { AccessibilityBar } from "@/components/accessibility-bar";
+import { SiteHeader } from "@/components/site-header";
 import { LiveRegion } from "@/components/live-region";
 import { Footer } from "@/components/footer";
 import { InstallExtensionBanner } from "@/components/install-extension-banner";
@@ -67,22 +68,25 @@ export default function ConversationPageClient() {
   return (
     <>
       <AccessibilityBar />
+      <SiteHeader compact />
       <LiveRegion message={announce} />
       {error && <LiveRegion message={error} urgency="assertive" />}
 
-      <ConversationProvider
-        onConnect={() => setAnnounce("Connexion établie, vous pouvez parler.")}
-        onDisconnect={() => setAnnounce("Conversation terminée.")}
-        onError={(m) =>
-          setError(typeof m === "string" ? m : "Erreur de communication")
-        }
-      >
-        <ConversationExperience
-          setAnnounce={setAnnounce}
-          error={error}
-          setError={setError}
-        />
-      </ConversationProvider>
+      <main id="main" tabIndex={-1}>
+        <ConversationProvider
+          onConnect={() => setAnnounce("Connexion établie, vous pouvez parler.")}
+          onDisconnect={() => setAnnounce("Conversation terminée.")}
+          onError={(m) =>
+            setError(typeof m === "string" ? m : "Erreur de communication")
+          }
+        >
+          <ConversationExperience
+            setAnnounce={setAnnounce}
+            error={error}
+            setError={setError}
+          />
+        </ConversationProvider>
+      </main>
 
       <Footer />
     </>
@@ -395,6 +399,7 @@ function ConversationExperience({ setAnnounce, error, setError }: UIProps) {
       last_order_days_ago: history.lastEntry
         ? String(
             Math.round(
+              // eslint-disable-next-line react-hooks/purity -- Date.now() dans useMemo, recalculé aux changements de lastEntry, précision "jours" suffisante pour l'agent
               (Date.now() - new Date(history.lastEntry.at).getTime()) /
                 (24 * 60 * 60 * 1000)
             )
@@ -431,7 +436,9 @@ function ConversationExperience({ setAnnounce, error, setError }: UIProps) {
           sendContextualUpdate(
             `Contexte session : magasin=${dynamicVariables.store_name}, extension=${dynamicVariables.extension_installed}, régime=${dynamicVariables.diet}`
           );
-        } catch {}
+        } catch (err) {
+            console.error("[conversation] sendContextualUpdate failed:", err);
+          }
       }, 500);
     } catch (err) {
       setError(

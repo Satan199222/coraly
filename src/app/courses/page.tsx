@@ -1,11 +1,10 @@
 "use client";
 
 import { Suspense, useState, useCallback, useEffect, useRef } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AccessibilityBar } from "@/components/accessibility-bar";
 import { LiveRegion } from "@/components/live-region";
-import { Logo } from "@/components/logo";
+import { SiteHeader } from "@/components/site-header";
 import { StoreSelector } from "@/components/store-selector";
 import { GroceryInput } from "@/components/grocery-input";
 import { ListClarification } from "@/components/list-clarification";
@@ -776,35 +775,15 @@ function Home() {
       {/* Alertes critiques (assertive, interrompent le lecteur d'écran) */}
       <LiveRegion message={criticalAlert} urgency="assertive" />
 
-      <div
+      <SiteHeader compact />
+
+      <main
+        id="main"
+        tabIndex={-1}
         className="max-w-2xl mx-auto px-4 py-8 space-y-8"
         inert={helpOpen}
       >
-        {/* Lien de retour vers la landing — utile pour changer de mode */}
-        <Link
-          href="/"
-          className="inline-block text-sm text-[var(--accent)] underline"
-          aria-label="Retour à l'accueil VoixCourses pour changer de mode"
-        >
-          ← Accueil VoixCourses
-        </Link>
-
-        <header className="flex items-center gap-4">
-          <div
-            className="shrink-0 w-16 h-16 rounded-2xl bg-[var(--bg-surface)] border-2 border-[var(--accent)] flex items-center justify-center text-[var(--accent)]"
-            style={{ boxShadow: "var(--shadow-md)" }}
-          >
-            <Logo className="w-10 h-10" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              VoixCourses
-            </h1>
-            <p className="text-[var(--text-muted)] mt-0.5 text-base">
-              Dictez ou tapez votre liste. L&apos;IA remplit votre panier Carrefour.
-            </p>
-          </div>
-        </header>
+        <h1 className="sr-only">Vos courses — VoixCourses</h1>
 
         {/* Indicateur d'étape visuel — complément aux annonces ARIA pour les
             utilisateurs voyants qui veulent situer leur progression. */}
@@ -1057,7 +1036,7 @@ function Home() {
           </button>
         )}
 
-      </div>
+      </main>
       <Footer />
     </>
   );

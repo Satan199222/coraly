@@ -27,6 +27,9 @@ export function InstallExtensionBanner() {
   const [browser, setBrowser] = useState<BrowserInfo | null>(null);
 
   useEffect(() => {
+    // Initialisation depuis APIs navigateur (navigator.*, localStorage)
+    // indisponibles en SSR. setState en effet assumé.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBrowser(detectBrowser());
     const dismissedAt = localStorage.getItem(DISMISS_KEY);
     if (dismissedAt) {
@@ -34,7 +37,6 @@ export function InstallExtensionBanner() {
       if (!Number.isNaN(ts) && Date.now() - ts < REMIND_AFTER_MS) {
         setDismissed(true);
       } else {
-        // Expiration : on oublie le dismiss passé pour rappeler à nouveau
         localStorage.removeItem(DISMISS_KEY);
       }
     }

@@ -15,6 +15,17 @@ interface AccessibilityBarProps {
   onHelpRequest?: () => void;
 }
 
+type Theme = "clair" | "sombre" | "jaune-noir" | "blanc-bleu";
+
+const THEME_OPTIONS: { value: Theme; label: string; aria: string }[] = [
+  { value: "clair", label: "Clair", aria: "Thème clair (par défaut)" },
+  { value: "sombre", label: "Sombre", aria: "Thème sombre" },
+  { value: "jaune-noir", label: "Jaune/Noir", aria: "Thème jaune sur noir, recommandé pour la DMLA" },
+  { value: "blanc-bleu", label: "Blanc/Bleu", aria: "Thème blanc sur bleu, recommandé pour le glaucome" },
+];
+
+const FONT_SIZES = ["16px", "18px", "22px", "28px"] as const;
+
 const DIET_OPTIONS: { value: DietaryRestriction; label: string }[] = [
   { value: "sans-gluten", label: "Sans gluten" },
   { value: "sans-lactose", label: "Sans lactose" },
@@ -37,27 +48,39 @@ const LOCALE_OPTIONS: { value: SpeechLocale; label: string }[] = [
   { value: "fr-CA", label: "Canada" },
 ];
 
+function isTheme(v: string | null): v is Theme {
+  return v === "clair" || v === "sombre" || v === "jaune-noir" || v === "blanc-bleu";
+}
+
+/** localStorage.getItem avec garde contre private-browsing / quota. */
+function safeLocalGet(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+/** localStorage.setItem avec garde contre private-browsing / quota. */
+function safeLocalSet(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    console.warn(`[a11y] localStorage.setItem(${key}) failed:`, err);
+  }
+}
+
 export function AccessibilityBar({
   onVoiceToggle,
   onHelpRequest,
 }: AccessibilityBarProps = {}) {
-  const [theme, setTheme] = useState<string>(() => {
-    if (typeof window === "undefined") return "dark";
-    return localStorage.getItem("voixcourses-theme") || "dark";
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "clair";
+    const saved = safeLocalGet("voixcourses-theme");
+    return isTheme(saved) ? saved : "clair";
   });
-  // Par défaut : "Grand" (1.3rem). VoixCourses cible les utilisateurs
-  // malvoyants — l'expérience initiale doit être confortable sans avoir
-  // à chercher le réglage.
   const [fontSize, setFontSize] = useState<string>(() => {
-    if (typeof window === "undefined") return "1.3rem";
-    return localStorage.getItem("voixcourses-font-size") || "1.3rem";
+    if (typeof window === "undefined") return "18px";
+    return safeLocalGet("voixcourses-font-size") || "18px";
   });
-  // Synthèse vocale ON par défaut : VoixCourses s'adresse en priorité à des
-  // utilisateurs non-voyants — il serait absurde de les obliger à l'activer.
-  // Persistée en localStorage pour respecter un éventuel choix explicite OFF.
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
-    const saved = localStorage.getItem("voixcourses-voice-enabled");
+    const saved = safeLocalGet("voixcourses-voice-enabled");
     return saved === null ? true : saved === "true";
   });
 
@@ -70,18 +93,17 @@ export function AccessibilityBar({
   const extension = useExtension();
   const { prefs, update } = usePreferences();
 
+  // Applique le thème : retire toutes les classes theme-*, ajoute la bonne.
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.remove("theme-light", "theme-high-contrast");
-    if (theme !== "dark") {
-      root.classList.add(`theme-${theme}`);
-    }
-    localStorage.setItem("voixcourses-theme", theme);
+    root.classList.remove("theme-sombre", "theme-jaune-noir", "theme-blanc-bleu");
+    if (theme !== "clair") root.classList.add(`theme-${theme}`);
+    safeLocalSet("voixcourses-theme", theme);
   }, [theme]);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--font-size-base", fontSize);
-    localStorage.setItem("voixcourses-font-size", fontSize);
+    safeLocalSet("voixcourses-font-size", fontSize);
   }, [fontSize]);
 
   function toggleDiet(d: DietaryRestriction) {
@@ -91,120 +113,155 @@ export function AccessibilityBar({
     update({ diet: next });
   }
 
+  const currentSizeIdx = FONT_SIZES.indexOf(fontSize as (typeof FONT_SIZES)[number]);
+  const decreaseDisabled = currentSizeIdx <= 0;
+  const increaseDisabled = currentSizeIdx >= FONT_SIZES.length - 1;
+
   return (
     <div
       role="region"
-      aria-label="Paramètres d'accessibilité"
-      className="bg-[var(--bg-surface)] border-b border-[var(--border)]"
+      aria-label="Préférences d'accessibilité"
+      className="border-b"
+      style={{
+        background: "var(--accent-ink)",
+        color: "var(--bg)",
+        borderColor: "rgba(244,238,227,0.1)",
+      }}
     >
-      {/* Ligne compacte — réglages rapides.
-          Thème et Taille sont mis en avant (fond contrasté fort, bordure
-          épaisse) pour rester trouvables même pour un utilisateur qui
-          découvre l'interface. Pas de "petit select discret". */}
-      <div className="flex items-center gap-2 flex-wrap px-4 py-3 text-base">
-        <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-[var(--bg)] border-2 border-[var(--accent)]">
-          <label htmlFor="theme-select" className="font-bold text-[var(--text)]">
-            🎨 Thème :
-          </label>
-          <select
-            id="theme-select"
-            value={theme}
-            onChange={(e) => setTheme(e.target.value)}
-            className="bg-[var(--bg-surface)] text-[var(--text)] border-2 border-[var(--accent)] rounded px-2 py-1 font-semibold cursor-pointer"
-          >
-            <option value="dark">Sombre</option>
-            <option value="light">Clair</option>
-            <option value="high-contrast">Contraste élevé</option>
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-[var(--bg)] border-2 border-[var(--accent)]">
-          <label htmlFor="font-size" className="font-bold text-[var(--text)]">
-            🔠 Taille :
-          </label>
-          <select
-            id="font-size"
-            value={fontSize}
-            onChange={(e) => setFontSize(e.target.value)}
-            className="bg-[var(--bg-surface)] text-[var(--text)] border-2 border-[var(--accent)] rounded px-2 py-1 font-semibold cursor-pointer"
-          >
-            <option value="1.125rem">Normal</option>
-            <option value="1.3rem">Grand</option>
-            <option value="1.5rem">Très grand</option>
-            <option value="1.8rem">Maximum</option>
-          </select>
-        </div>
-
-        <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg)] border-2 border-[var(--border)] cursor-pointer hover:border-[var(--accent)] transition-colors">
-          <input
-            type="checkbox"
-            checked={voiceEnabled}
-            onChange={(e) => {
-              const next = e.target.checked;
-              setVoiceEnabled(next);
-              localStorage.setItem("voixcourses-voice-enabled", String(next));
-              onVoiceToggle?.(next);
-            }}
-            className="w-5 h-5 accent-[var(--accent)]"
-            aria-describedby="voice-help"
-          />
-          <span className="font-semibold text-[var(--text)]">🔊 Synthèse vocale</span>
-        </label>
-        <span id="voice-help" className="sr-only">
-          Quand activé, VoixCourses lit à voix haute le contenu de chaque bouton ou champ que vous survolez au clavier, en plus des annonces automatiques du lecteur d&apos;écran.
-        </span>
-
-        {extension.installed && (
+      {/* Ligne compacte : Aa-/+ · 4 thèmes · voix · préférences · aide */}
+      <div className="flex items-center justify-between gap-4 flex-wrap px-6 py-3 text-[15px]">
+        <div className="flex items-center gap-3 font-semibold">
           <span
-            className="px-3 py-2 rounded-lg bg-[var(--success)] text-[var(--bg)] font-bold text-sm"
-            aria-label={`Extension VoixCourses version ${extension.version} détectée`}
-            title={`Extension v${extension.version}`}
+            aria-hidden="true"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-full border-2 text-sm font-bold"
+            style={{ borderColor: "var(--bg)" }}
           >
-            ✓ Extension OK
+            Aa
           </span>
-        )}
+          <span>Confort de lecture</span>
+        </div>
 
-        {onHelpRequest && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Taille de texte */}
           <button
             type="button"
-            onClick={onHelpRequest}
-            aria-label="Afficher l'aide et les raccourcis clavier"
-            className="ml-auto px-3 py-2 rounded-lg border-2 border-[var(--border)] text-[var(--text)] font-bold hover:border-[var(--accent)] transition-colors"
+            aria-label="Diminuer la taille du texte"
+            disabled={decreaseDisabled}
+            onClick={() =>
+              setFontSize(FONT_SIZES[Math.max(0, currentSizeIdx - 1)])
+            }
+            className="px-3 py-1.5 rounded border text-sm font-semibold disabled:opacity-40"
+            style={{ borderColor: "rgba(244,238,227,0.3)", color: "var(--bg)" }}
           >
-            ? Aide
+            Aa −
           </button>
-        )}
+          <button
+            type="button"
+            aria-label="Augmenter la taille du texte"
+            disabled={increaseDisabled}
+            onClick={() =>
+              setFontSize(FONT_SIZES[Math.min(FONT_SIZES.length - 1, currentSizeIdx + 1)])
+            }
+            className="px-3 py-1.5 rounded border text-sm font-semibold disabled:opacity-40"
+            style={{ borderColor: "rgba(244,238,227,0.3)", color: "var(--bg)" }}
+          >
+            Aa +
+          </button>
+
+          <span aria-hidden="true" className="opacity-40 mx-1">·</span>
+
+          {/* 4 thèmes visibles */}
+          {THEME_OPTIONS.map((opt) => {
+            const active = theme === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                aria-label={opt.aria}
+                aria-pressed={active}
+                onClick={() => setTheme(opt.value)}
+                className="px-3 py-1.5 rounded border text-sm"
+                style={{
+                  borderColor: active ? "var(--brass)" : "rgba(244,238,227,0.3)",
+                  background: active ? "var(--brass)" : "transparent",
+                  color: active ? "var(--accent-ink)" : "var(--bg)",
+                  fontWeight: active ? 700 : 600,
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+
+          <span aria-hidden="true" className="opacity-40 mx-1">·</span>
+
+          {/* Voix */}
+          <button
+            type="button"
+            aria-pressed={voiceEnabled}
+            onClick={() => {
+              const next = !voiceEnabled;
+              setVoiceEnabled(next);
+              safeLocalSet("voixcourses-voice-enabled", String(next));
+              onVoiceToggle?.(next);
+            }}
+            className="px-3 py-1.5 rounded border text-sm font-semibold"
+            style={{
+              borderColor: voiceEnabled ? "var(--brass)" : "rgba(244,238,227,0.3)",
+              background: voiceEnabled ? "var(--brass)" : "transparent",
+              color: voiceEnabled ? "var(--accent-ink)" : "var(--bg)",
+            }}
+          >
+            🔊 Voix {voiceEnabled ? "active" : "coupée"}
+          </button>
+
+          {extension.installed && (
+            <span
+              className="px-2 py-1 rounded text-xs font-bold"
+              style={{ background: "var(--brass)", color: "var(--accent-ink)" }}
+              aria-label={`Extension VoixCourses version ${extension.version} détectée`}
+              title={`Extension v${extension.version}`}
+            >
+              ✓ Extension
+            </span>
+          )}
+
+          {onHelpRequest && (
+            <button
+              type="button"
+              onClick={onHelpRequest}
+              aria-label="Afficher l'aide et les raccourcis clavier"
+              className="px-3 py-1.5 rounded border text-sm font-semibold"
+              style={{ borderColor: "rgba(244,238,227,0.3)", color: "var(--bg)" }}
+            >
+              ? Aide
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Préférences avancées — repliées par défaut, chargées en lazy pour l'utilisateur qui en a besoin */}
-      <details
-        className="px-4 pb-2"
-        onToggle={(e) => {
-          // Annonce d'état pour les lecteurs d'écran : certains SR lisent
-          // "replié/déplié" sur summary, mais pas tous. Doublon sûr.
-          const open = (e.target as HTMLDetailsElement).open;
-          if (typeof window !== "undefined" && window.speechSynthesis) {
-            // Rien — pas besoin de speak ici, le role=group suffit en SR moderne.
-            // On laisse la règle à l'état par défaut.
-          }
-          void open;
-        }}
-      >
+      {/* Préférences avancées — repliées par défaut */}
+      <details className="px-6 pb-3">
         <summary
-          className="cursor-pointer text-sm text-[var(--text-muted)] hover:text-[var(--text)] py-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] rounded"
-          aria-label="Préférences avancées : vitesse vocale, régime alimentaire, variante du français. Dépliez pour modifier."
+          className="cursor-pointer text-sm py-2 font-semibold"
+          style={{ color: "rgba(244,238,227,0.85)" }}
+          aria-label="Préférences avancées : vitesse vocale, régime alimentaire, variante du français, allergènes. Dépliez pour modifier."
         >
-          Préférences avancées (vitesse vocale, régime alimentaire, variante du français)
+          ⚙ Préférences avancées (vitesse vocale, régime, variante, allergènes)
         </summary>
 
-        <div className="grid gap-4 mt-3 md:grid-cols-2 text-sm">
+        <div
+          className="grid gap-4 mt-3 md:grid-cols-2 text-sm"
+          style={{ color: "var(--bg)" }}
+        >
           {/* Régime alimentaire */}
-          <fieldset className="border border-[var(--border)] rounded p-3">
-            <legend className="px-2 font-semibold text-[var(--text-muted)]">
-              Régime alimentaire
-            </legend>
-            <p className="text-xs text-[var(--text-muted)] mb-2">
-              Ces contraintes sont appliquées automatiquement à toutes vos recherches.
+          <fieldset
+            className="rounded p-3"
+            style={{ border: "1px solid rgba(244,238,227,0.2)" }}
+          >
+            <legend className="px-2 font-semibold">Régime alimentaire</legend>
+            <p className="text-xs mb-2" style={{ color: "rgba(244,238,227,0.7)" }}>
+              Appliqué à toutes vos recherches.
             </p>
             <div className="flex flex-wrap gap-2">
               {DIET_OPTIONS.map((opt) => {
@@ -216,11 +273,13 @@ export function AccessibilityBar({
                     onClick={() => toggleDiet(opt.value)}
                     aria-pressed={active}
                     aria-label={`Régime ${opt.label}${active ? ", activé" : ", désactivé"}`}
-                    className={`px-3 py-1 rounded border text-sm transition-colors ${
-                      active
-                        ? "bg-[var(--accent)] text-[var(--bg)] border-[var(--accent)]"
-                        : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--accent)]"
-                    }`}
+                    className="px-3 py-1 rounded border text-sm"
+                    style={{
+                      borderColor: active ? "var(--brass)" : "rgba(244,238,227,0.3)",
+                      background: active ? "var(--brass)" : "transparent",
+                      color: active ? "var(--accent-ink)" : "var(--bg)",
+                      fontWeight: active ? 700 : 500,
+                    }}
                   >
                     {opt.label}
                   </button>
@@ -229,81 +288,81 @@ export function AccessibilityBar({
             </div>
           </fieldset>
 
-          {/* Vocal : vitesse + variante */}
-          <fieldset className="border border-[var(--border)] rounded p-3">
-            <legend className="px-2 font-semibold text-[var(--text-muted)]">
-              Synthèse vocale
-            </legend>
+          {/* Synthèse vocale */}
+          <fieldset
+            className="rounded p-3"
+            style={{ border: "1px solid rgba(244,238,227,0.2)" }}
+          >
+            <legend className="px-2 font-semibold">Synthèse vocale</legend>
 
             <div className="flex items-center gap-2 mb-2">
-              <label htmlFor="speech-rate" className="text-[var(--text-muted)] min-w-[80px]">
+              <label htmlFor="speech-rate" className="min-w-[80px]">
                 Vitesse :
               </label>
               <select
                 id="speech-rate"
                 value={prefs.speechRate}
                 onChange={(e) => update({ speechRate: e.target.value as SpeechRate })}
-                className="bg-[var(--bg)] text-[var(--text)] border border-[var(--border)] rounded px-2 py-1 text-sm"
+                className="rounded px-2 py-1 text-sm"
+                style={{
+                  background: "rgba(244,238,227,0.1)",
+                  color: "var(--bg)",
+                  border: "1px solid rgba(244,238,227,0.3)",
+                }}
               >
                 {RATE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
+                  <option key={o.value} value={o.value} style={{ color: "#000" }}>
                     {o.label}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
-              <label htmlFor="speech-locale" className="text-[var(--text-muted)] min-w-[80px]">
+            <div className="flex items-center gap-2 mb-2">
+              <label htmlFor="speech-locale" className="min-w-[80px]">
                 Variante :
               </label>
               <select
                 id="speech-locale"
                 value={prefs.speechLocale}
-                onChange={(e) =>
-                  update({ speechLocale: e.target.value as SpeechLocale })
-                }
-                className="bg-[var(--bg)] text-[var(--text)] border border-[var(--border)] rounded px-2 py-1 text-sm"
+                onChange={(e) => update({ speechLocale: e.target.value as SpeechLocale })}
+                className="rounded px-2 py-1 text-sm"
+                style={{
+                  background: "rgba(244,238,227,0.1)",
+                  color: "var(--bg)",
+                  border: "1px solid rgba(244,238,227,0.3)",
+                }}
               >
                 {LOCALE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
+                  <option key={o.value} value={o.value} style={{ color: "#000" }}>
                     {o.label}
                   </option>
                 ))}
               </select>
             </div>
-
-            <p className="text-xs text-[var(--text-muted)] mt-2">
-              Affecte la reconnaissance vocale et la synthèse vocale.
-            </p>
 
             <label className="flex items-center gap-2 mt-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={prefs.premiumVoice}
                 onChange={(e) => update({ premiumVoice: e.target.checked })}
-                className="w-4 h-4 accent-[var(--accent)]"
+                className="w-4 h-4"
                 aria-describedby="premium-voice-help"
               />
-              <span className="font-semibold text-[var(--text)]">
-                ✨ Voix premium (ElevenLabs)
-              </span>
+              <span className="font-semibold">✨ Voix premium (ElevenLabs)</span>
             </label>
-            <p
-              id="premium-voice-help"
-              className="text-xs text-[var(--text-muted)] mt-1 ml-6"
-            >
-              Voix de synthèse studio en ligne. Désactivez pour utiliser la
-              voix native du navigateur (offline, plus rapide, plus robotique).
+            <p id="premium-voice-help" className="text-xs mt-1 ml-6" style={{ color: "rgba(244,238,227,0.7)" }}>
+              Voix studio en ligne. Désactivez pour la voix native du navigateur (offline).
             </p>
           </fieldset>
 
-          {/* Allergènes — input libre */}
-          <fieldset className="border border-[var(--border)] rounded p-3 md:col-span-2">
-            <legend className="px-2 font-semibold text-[var(--text-muted)]">
-              Allergènes à éviter
-            </legend>
-            <p className="text-xs text-[var(--text-muted)] mb-2">
+          {/* Allergènes */}
+          <fieldset
+            className="rounded p-3 md:col-span-2"
+            style={{ border: "1px solid rgba(244,238,227,0.2)" }}
+          >
+            <legend className="px-2 font-semibold">Allergènes à éviter</legend>
+            <p className="text-xs mb-2" style={{ color: "rgba(244,238,227,0.7)" }}>
               Séparés par des virgules — ex : arachide, fruits à coque, moutarde.
             </p>
             <input
@@ -316,7 +375,12 @@ export function AccessibilityBar({
                   .filter(Boolean);
                 update({ allergens: list });
               }}
-              className="w-full px-3 py-2 rounded border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] text-sm focus:border-[var(--accent)]"
+              className="w-full px-3 py-2 rounded text-sm"
+              style={{
+                background: "rgba(244,238,227,0.1)",
+                color: "var(--bg)",
+                border: "1px solid rgba(244,238,227,0.3)",
+              }}
               aria-label="Liste des allergènes à éviter, séparés par des virgules"
             />
           </fieldset>

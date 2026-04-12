@@ -6,6 +6,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 
 const RESULTS_DIR = join(import.meta.dirname, 'results');
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- helper conservé pour probes futures
 async function save(name, data) {
   await mkdir(RESULTS_DIR, { recursive: true });
   await writeFile(join(RESULTS_DIR, `auchan-${name}.json`), JSON.stringify(data, null, 2));
@@ -147,7 +148,7 @@ async function run() {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10000 });
       const title = await page.title();
       console.log(`  ${url.split('/').pop()}: "${title?.slice(0, 50)}" — HTTP ${page.url().includes('404') ? '404' : 'OK'}`);
-    } catch (e) {
+    } catch {
       console.log(`  ${url.split('/').pop()}: timeout`);
     }
   }

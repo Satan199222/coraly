@@ -33,7 +33,9 @@ export function playBeep(kind: "start" | "stop"): void {
   // Certains browsers suspendent le context tant qu'il n'y a pas d'interaction
   // utilisateur. Au 1er appel après un click, resume() est silencieux si déjà OK.
   if (audio.state === "suspended") {
-    audio.resume().catch(() => {});
+    audio.resume().catch((err) => {
+      console.warn("[beep] AudioContext.resume failed:", err);
+    });
   }
 
   const osc = audio.createOscillator();

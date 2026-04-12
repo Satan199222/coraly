@@ -28,6 +28,7 @@ export function LiveRegion({ message, urgency = "polite" }: LiveRegionProps) {
 
   useEffect(() => {
     if (!message) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset synchro quand la prop change de non-vide → vide
       setDisplayed("");
       return;
     }
