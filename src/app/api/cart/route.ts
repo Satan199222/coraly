@@ -29,9 +29,20 @@ export async function PATCH(request: NextRequest) {
       { status: 400 }
     );
   }
+  const finalQuantity = quantity ?? 1;
+  if (
+    !Number.isInteger(finalQuantity) ||
+    finalQuantity < 1 ||
+    finalQuantity > 99
+  ) {
+    return NextResponse.json(
+      { error: "quantity doit être un entier entre 1 et 99" },
+      { status: 400 }
+    );
+  }
 
   try {
-    const cart = await addToCart(ean, basketServiceId, quantity ?? 1);
+    const cart = await addToCart(ean, basketServiceId, finalQuantity);
     return NextResponse.json(cart);
   } catch (err) {
     console.error("[cart] PATCH failed:", err);

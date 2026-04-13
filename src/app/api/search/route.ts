@@ -47,12 +47,13 @@ export async function GET(request: NextRequest) {
   const brand = request.nextUrl.searchParams.get("brand") ?? undefined;
   const qtyParam = request.nextUrl.searchParams.get("qty");
   const unit = request.nextUrl.searchParams.get("unit") ?? undefined;
+  const storeRef = request.nextUrl.searchParams.get("storeRef") ?? undefined;
 
   const diet = dietParam ? dietParam.split(",").filter(Boolean) : undefined;
   const targetQuantity = qtyParam ? Number(qtyParam) : undefined;
 
   try {
-    const result = await searchProducts(query);
+    const result = await searchProducts(query, storeRef);
     const ranked = rankProducts(result.products, query, {
       diet,
       brand,

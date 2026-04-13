@@ -1950,7 +1950,7 @@ import { SiteHeader } from "@/components/site-header";
 ```bash
 grep -n 'bg-\[#\|text-\[#\|bg-blue\|bg-gray' src/app/courses/page.tsx
 ```
-Chaque occurrence doit être remplacée par `bg-[var(--...)]` / `text-[var(--...)]` pointant vers un token. Ne pas remplacer aveuglément — si un écart a du sens (ex: badge de statut d'erreur), le laisser.
+Chaque occurrence doit être remplacée par `bg-[var(--accent)]` / `text-[var(--text)]` (ou un autre token valide). Ne pas remplacer aveuglément — si un écart a du sens (ex: badge de statut d'erreur), le laisser.
 
 - [ ] **Step 4: Vérifier visuellement**
 

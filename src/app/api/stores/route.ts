@@ -5,15 +5,23 @@ import {
   getBasketServiceId,
 } from "@/lib/carrefour/client";
 
+const WOOSMAP_API_KEY = process.env.WOOSMAP_API_KEY;
+
 export async function GET(request: NextRequest) {
   const postalCode = request.nextUrl.searchParams.get("postalCode");
   if (!postalCode) {
     return NextResponse.json({ error: "postalCode requis" }, { status: 400 });
   }
+  if (!WOOSMAP_API_KEY) {
+    return NextResponse.json(
+      { error: "Configuration serveur incomplète (WOOSMAP_API_KEY manquante)." },
+      { status: 500 }
+    );
+  }
 
   try {
     const geoRes = await fetch(
-      `https://api.woosmap.com/localities/autocomplete/?key=woos-26fe76aa-ff24-3255-b25b-e1bde7b7a683&input=${postalCode}&components=country:fr`,
+      `https://api.woosmap.com/localities/autocomplete/?key=${WOOSMAP_API_KEY}&input=${postalCode}&components=country:fr`,
       {
         headers: {
           origin: "https://www.carrefour.fr",
