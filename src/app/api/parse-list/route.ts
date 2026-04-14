@@ -18,7 +18,7 @@ const RATE_WINDOW_MS = 60_000;
 
 export async function POST(request: NextRequest) {
   const key = `parse-list:${clientKey(request)}`;
-  const rl = rateLimit(key, RATE_MAX, RATE_WINDOW_MS);
+  const rl = await rateLimit(key, RATE_MAX, RATE_WINDOW_MS);
   if (!rl.ok) {
     return NextResponse.json(
       {

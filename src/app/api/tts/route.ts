@@ -32,7 +32,7 @@ const RATE_WINDOW_MS = 60_000;
 const VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
 
 export async function POST(request: NextRequest) {
-  const rl = rateLimit(
+  const rl = await rateLimit(
     `tts:${clientKey(request)}`,
     RATE_MAX,
     RATE_WINDOW_MS

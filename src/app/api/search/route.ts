@@ -15,7 +15,7 @@ const RATE_WINDOW_MS = 60_000;
 const MAX_QUERY_LENGTH = 200;
 
 export async function GET(request: NextRequest) {
-  const rl = rateLimit(
+  const rl = await rateLimit(
     `search:${clientKey(request)}`,
     RATE_MAX,
     RATE_WINDOW_MS
