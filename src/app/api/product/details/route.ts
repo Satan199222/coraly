@@ -22,7 +22,7 @@ const RATE_MAX = 20;
 const RATE_WINDOW_MS = 60_000;
 
 export async function GET(request: NextRequest) {
-  const rl = rateLimit(
+  const rl = await rateLimit(
     `product-details:${clientKey(request)}`,
     RATE_MAX,
     RATE_WINDOW_MS
