@@ -1,0 +1,23 @@
+#!/bin/sh
+# Hook pre-push — Bloque les push directs sur main
+# Installé automatiquement par dev-conventions/sync.sh
+
+PROTECTED_BRANCH="main"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    "refs/heads/$PROTECTED_BRANCH")
+      echo ""
+      echo "Push direct sur '$PROTECTED_BRANCH' interdit."
+      echo ""
+      echo "   Cree une branche et fais une PR :"
+      echo "   git checkout -b feat/ma-feature"
+      echo "   git push -u origin feat/ma-feature"
+      echo "   gh pr create"
+      echo ""
+      exit 1
+      ;;
+  esac
+done
+
+exit 0

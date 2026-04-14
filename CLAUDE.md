@@ -1,3 +1,20 @@
+<!-- sync:dev-conventions -->
+
+## Conventions partagées — OBLIGATOIRE
+
+**Tu DOIS appliquer les conventions définies dans `CLAUDE_SHARED.md` comme référence de base pour tout le code de ce projet.**
+
+- `CLAUDE_SHARED.md` contient les conventions globales (stack, patterns, naming, sécurité, etc.) — **lis-le et applique-le**
+- Ce fichier (`CLAUDE.md`) complète et peut overrider `CLAUDE_SHARED.md` pour les spécificités du projet
+- Si une convention de `CLAUDE_SHARED.md` n'est pas encore en place dans ce projet, **mets-la en place** quand tu touches au code concerné
+- Toujours consulter la doc officielle des libs via **Context7** avant d'écrire du code
+
+> `CLAUDE_SHARED.md` est synchronisé automatiquement depuis le repo `dev-conventions` à chaque démarrage de Claude Code.
+> **Si tu modifies `CLAUDE_SHARED.md` depuis ce projet**, tu dois aussi mettre à jour le repo source :
+> `cd ~/projects/dev-conventions && git pull && git add CLAUDE_SHARED.md && git commit -m "fix: update shared conventions" && git push`
+
+---
+
 # VoixCourses — Conventions projet
 
 ## Stack

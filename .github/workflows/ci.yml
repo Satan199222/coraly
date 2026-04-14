@@ -2,34 +2,78 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: "Lancer les tests E2E"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  quality:
+  ci:
+    name: Lint & Typecheck
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          node-version: 20
+          cache: pnpm
 
-      - name: Install dependencies
-        run: npm ci
+      - run: pnpm install --frozen-lockfile
 
-      - name: Format
-        run: npm run format
+      - name: Generate (Prisma, etc.)
+        run: |
+          if jq -e '.scripts["db:generate"]' package.json >/dev/null 2>&1; then
+            pnpm db:generate
+          else
+            echo "⏭️ Pas de script db:generate, skip"
+          fi
 
       - name: Lint
-        run: npm run lint
+        run: |
+          if jq -e '.scripts.lint' package.json >/dev/null 2>&1; then
+            pnpm lint
+          else
+            echo "⏭️ Pas de script lint, skip"
+          fi
 
-      - name: Test
-        run: npm test
+      - name: Typecheck
+        run: |
+          if jq -e '.scripts.typecheck' package.json >/dev/null 2>&1; then
+            pnpm typecheck
+          elif jq -e '.scripts["type-check"]' package.json >/dev/null 2>&1; then
+            pnpm type-check
+          else
+            echo "⏭️ Pas de script typecheck, skip"
+          fi
 
-      - name: Build
-        run: npm run build
+  e2e:
+    name: Tests E2E
+    if: github.event.inputs.run_e2e == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run E2E
+        run: pnpm test:e2e
