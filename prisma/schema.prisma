@@ -49,7 +49,7 @@ model TvProgram {
   /// Horodatage de la dernière récupération depuis SFR EPG
   fetchedAt DateTime @map("fetched_at")
 
-  @@index([channelId, startAt])
+  @@unique([channelId, startAt], name: "channelId_startAt")
   @@index([startAt, endAt])
   @@map("tv_programs")
 }
