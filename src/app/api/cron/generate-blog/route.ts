@@ -64,6 +64,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const isoWeek = getISOWeek();
   const topic = getTopicForWeek(isoWeek);
 
+  if (!topic) {
+    console.error("[cron/generate-blog] BLOG_TOPICS est vide — impossible de sélectionner un sujet");
+    return NextResponse.json({ error: "Aucun topic disponible" }, { status: 500 });
+  }
+
   console.info(`[cron/generate-blog] Semaine ISO ${isoWeek} → topic #${topic.id} : "${topic.title}"`);
 
   // -- Génération du contenu ---------------------------------------------------

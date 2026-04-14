@@ -214,8 +214,12 @@ export function getISOWeek(date: Date = new Date()): number {
 /**
  * Sélectionne le topic pour une semaine ISO donnée.
  * La rotation est circulaire : semaine 1 → topic 0, semaine 31 → topic 0, etc.
+ *
+ * Retourne `undefined` si le tableau est vide pour éviter un crash silencieux
+ * (modulo 0 = NaN → tableau[NaN] = undefined avec l'ancienne signature).
  */
-export function getTopicForWeek(isoWeek: number): BlogTopic {
+export function getTopicForWeek(isoWeek: number): BlogTopic | undefined {
+  if (BLOG_TOPICS.length === 0) return undefined;
   const index = (isoWeek - 1) % BLOG_TOPICS.length;
   return BLOG_TOPICS[index];
 }
