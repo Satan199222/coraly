@@ -1,14 +1,31 @@
 "use client";
 
+/**
+ * VoixTransport — Page /transport
+ * Interface conversationnelle Koraly pour les transports en commun IdF.
+ *
+ * Fonctionnalités :
+ * - Koraly répond en langage naturel aux questions transport
+ * - Exemples : "Prochain RER A à Nation ?", "Perturbations ligne 13 ?"
+ * - Orchestration PRIM/IDFM + SNCF par détection d'intention
+ * - Raccourcis vocaux (V = micro, Échap = stop)
+ * - WCAG AAA, police Luciole, design system marine
+ *
+ * Limite V1 : bus urbains hors IdF non couverts.
+ * GROA-232 — Phase 2b VoixTransport
+ */
+
 import {
   useCallback,
   useEffect,
-  useId,
   useRef,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 import { AccessibilityBar } from "@/lib/shared/components/accessibility-bar";
 import { LiveRegion } from "@/lib/shared/components/live-region";
+import { KoralyOrb } from "@/lib/shared/components/koraly-orb";
+import type { KoralyOrbStatus } from "@/lib/shared/components/koraly-orb";
 import { SiteHeader } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { HelpDialog } from "@/components/help-dialog";
@@ -16,22 +33,103 @@ import { useSpeech } from "@/lib/shared/speech/use-speech";
 import { usePreferences, SPEECH_RATE_VALUE } from "@/lib/preferences/use-preferences";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type {
-  TransportStop,
+  TransportDeparture,
+  TransportDisruption,
+  TrainDeparture,
   TransportJourney,
-  TransportLeg,
+  TransportStop,
+  TransportLineInfo,
 } from "@/lib/transport/types";
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Types
 // ---------------------------------------------------------------------------
 
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0 && m > 0) return `${h}h${m.toString().padStart(2, "0")}`;
-  if (h > 0) return `${h}h`;
-  return `${m} min`;
+type KoralyIntent =
+  | { type: "departures_idfm"; stopQuery: string; lineFilter?: string }
+  | { type: "departures_sncf"; stationQuery: string }
+  | { type: "disruptions"; lineQuery: string }
+  | { type: "journey"; fromQuery: string; toQuery: string }
+  | { type: "unknown"; originalQuery: string };
+
+interface ChatMsg {
+  id: string;
+  role: "user" | "koraly";
+  text: string;
+  loading?: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Intent parser — détection d'intention en français
+// ---------------------------------------------------------------------------
+
+function parseIntent(query: string): KoralyIntent {
+  const q = query.trim();
+  const ql = q.toLowerCase();
+
+  // Itinéraire A→B
+  const journeyRx =
+    /(?:aller|itinéraire|trajet|comment aller|chemin|route)\s+(?:de\s+)?(.+?)\s+(?:à|vers|pour|jusqu[''à]+)\s+(.+?)[\s?!.]*$/i;
+  const jm = ql.match(journeyRx);
+  if (jm) {
+    return { type: "journey", fromQuery: jm[1].trim(), toQuery: jm[2].trim() };
+  }
+
+  // Perturbations / infos trafic
+  const disruptRx =
+    /(?:perturbation[s]?|problème[s]?|incident[s]?|travaux|info[s]? trafic|alerte[s]?|retard[s]?)\s+(?:sur\s+)?(?:la\s+|le\s+|l[''a]?\s+)?(?:ligne\s+)?([a-z0-9\s+]+?)[\s?!.]*$/i;
+  const dm = ql.match(disruptRx);
+  if (dm) {
+    return { type: "disruptions", lineQuery: dm[1].trim() };
+  }
+  // Aussi : "y a-t-il des perturbations sur le RER B"
+  const disruptRx2 =
+    /(?:perturbation[s]?|problème[s]?)\s+(?:sur|pour|ligne)\s+(.+?)[\s?!.]*$/i;
+  const dm2 = ql.match(disruptRx2);
+  if (dm2) {
+    return { type: "disruptions", lineQuery: dm2[1].trim() };
+  }
+
+  // Trains longue distance SNCF
+  if (/\b(tgv|ter|ouigo|intercités|intercites|grandes lignes|eurostar|thalys|inoui)\b/i.test(ql)) {
+    const trainRx = /(?:depuis|de|gare\s+de|station\s+de|à)\s+(.+?)(?:\s+vers|\s+pour|\s+direction|\?|!|\.|$)/i;
+    const tm = ql.match(trainRx);
+    return { type: "departures_sncf", stationQuery: tm?.[1]?.trim() ?? q };
+  }
+
+  // Départs IDFM — "Prochain [ligne] à [arrêt]" ou "Bus X à [arrêt]"
+  const depRx =
+    /(?:prochain[se]?|passage[s]?|départ[s]?|bus|métro|rer|tram(?:way)?|t\d|ligne)\s+([a-z0-9+]+(?:\s+[a-z0-9]+)?)\s+(?:à|au|aux|en direction|depuis|station|stop)\s+(.+?)[\s?!.]*$/i;
+  const depm = ql.match(depRx);
+  if (depm) {
+    return {
+      type: "departures_idfm",
+      lineFilter: depm[1].trim(),
+      stopQuery: depm[2].trim(),
+    };
+  }
+
+  // Départs sans ligne : "Prochains passages à Nation"
+  const depRx2 =
+    /(?:prochain[se]?|passage[s]?|départ[s]?|quand passe)\s+(?:le\s+|les\s+)?(?:prochain[es]?\s+)?(?:(?:métro|bus|rer|tram)\s+)?(?:à|au|à la|station|arrêt)\s+(.+?)[\s?!.]*$/i;
+  const depm2 = ql.match(depRx2);
+  if (depm2) {
+    return { type: "departures_idfm", stopQuery: depm2[1].trim() };
+  }
+
+  // Arrêt simple mentionné après "à" ou en fin de phrase (ex: "Nation ?")
+  // Heuristique : si ≤ 4 mots et ressemble à un arrêt connu
+  const words = q.split(/\s+/);
+  if (words.length <= 5 && !ql.match(/^(?:aide|help|bonjour|merci|salut)/)) {
+    return { type: "departures_idfm", stopQuery: q.replace(/[?!.]+$/, "").trim() };
+  }
+
+  return { type: "unknown", originalQuery: q };
+}
+
+// ---------------------------------------------------------------------------
+// Helpers de formatage oral
+// ---------------------------------------------------------------------------
 
 function formatTime(iso: string): string {
   try {
@@ -44,487 +142,455 @@ function formatTime(iso: string): string {
   }
 }
 
+function delayInMinutes(expectedISO: string): number {
+  return Math.round((new Date(expectedISO).getTime() - Date.now()) / 60_000);
+}
+
+function departureToText(dep: TransportDeparture): string {
+  const inMin = delayInMinutes(dep.expectedTime);
+  const timeStr =
+    inMin <= 0 ? "maintenant" : inMin === 1 ? "dans 1 minute" : `dans ${inMin} minutes`;
+  return `${dep.mode} ${dep.lineName} direction ${dep.direction} — ${timeStr}`;
+}
+
+function trainDepartureToText(dep: TrainDeparture): string {
+  const time = formatTime(dep.expectedTime);
+  const delayTxt = dep.delay > 60 ? ` (retard ${Math.round(dep.delay / 60)} min)` : "";
+  return `${dep.trainNumber} vers ${dep.direction} à ${time}${delayTxt}${dep.platform ? `, voie ${dep.platform}` : ""}`;
+}
+
+function disruptionToText(d: TransportDisruption): string {
+  const sev =
+    d.severity === "blocking"
+      ? "Trafic bloqué"
+      : d.severity === "significant_delays"
+      ? "Retards importants"
+      : d.severity === "reduced_service"
+      ? "Service réduit"
+      : "Information";
+  return `${sev} — ${d.title || d.message}`;
+}
+
 function journeyToSpeech(journey: TransportJourney): string {
-  const depart = formatTime(journey.departure);
-  const arrivee = formatTime(journey.arrival);
-  const duree = formatDuration(journey.totalDuration);
-  const correspondances =
+  const dur = Math.round(journey.totalDuration / 60);
+  const dep = formatTime(journey.departure);
+  const arr = formatTime(journey.arrival);
+  const transf =
     journey.transfers === 0
       ? "sans correspondance"
       : `${journey.transfers} correspondance${journey.transfers > 1 ? "s" : ""}`;
-
-  const lignes = journey.legs
-    .filter((l): l is TransportLeg & { type: "transit" } => l.type === "transit")
-    .map((l) => {
-      const stops = l.stops?.length ? ` (${l.stops.length + 1} arrêts)` : "";
-      return `${l.mode ?? "Ligne"} ${l.lineName ?? ""} direction ${l.direction ?? "inconnue"}${stops}`;
-    })
-    .join(", puis ");
-
-  return `Départ à ${depart}, arrivée à ${arrivee}, durée ${duree}, ${correspondances}. ${lignes}`;
+  return `Départ à ${dep}, arrivée à ${arr}, ${dur} minutes, ${transf}.`;
 }
 
 // ---------------------------------------------------------------------------
-// Composant Autocomplete (combobox ARIA)
+// Orchestrateur Koraly — appels API + formatage réponse
 // ---------------------------------------------------------------------------
 
-interface StopComboboxProps {
-  id: string;
-  label: string;
-  value: string;
-  selectedStop: TransportStop | null;
-  onChange: (value: string) => void;
-  onSelect: (stop: TransportStop) => void;
+async function fetchStops(q: string): Promise<TransportStop[]> {
+  const res = await fetch(`/api/transport/stops?q=${encodeURIComponent(q)}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return (data as { stops: TransportStop[] }).stops ?? [];
 }
 
-function StopCombobox({
-  id,
-  label,
-  value,
-  selectedStop,
-  onChange,
-  onSelect,
-}: StopComboboxProps) {
-  const listboxId = `${id}-listbox`;
-  const [suggestions, setSuggestions] = useState<TransportStop[]>([]);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+async function fetchLines(q: string): Promise<TransportLineInfo[]> {
+  const res = await fetch(`/api/transport/idfm/lines?q=${encodeURIComponent(q)}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data as { lines: TransportLineInfo[] }).lines ?? [];
+}
 
-  // Cherche les arrêts après 300ms de pause de frappe.
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    if (value.length < 2 || selectedStop) {
-      setSuggestions([]);
-      setOpen(false);
-      return;
-    }
-
-    debounceRef.current = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          `/api/transport/stops?q=${encodeURIComponent(value)}`
-        );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        setSuggestions(data.stops ?? []);
-        setOpen((data.stops ?? []).length > 0);
-        setActiveIndex(-1);
-      } catch (err) {
-        console.warn("[transport] autocomplete failed:", err);
-      } finally {
-        setLoading(false);
+async function handleIntent(intent: KoralyIntent): Promise<string> {
+  switch (intent.type) {
+    // ------------------------------------------------------------------
+    // Départs IDFM
+    // ------------------------------------------------------------------
+    case "departures_idfm": {
+      const stops = await fetchStops(intent.stopQuery);
+      if (stops.length === 0) {
+        return `Je n'ai pas trouvé l'arrêt « ${intent.stopQuery} ». Essayez un nom plus précis, par exemple « Châtelet - Les Halles » ou « Nation ».`;
       }
-    }, 300);
+      const stop = stops[0];
+      const res = await fetch(
+        `/api/transport/idfm/departures?stop_id=${encodeURIComponent(stop.id)}&count=6`
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      let departures: TransportDeparture[] = (data as { departures: TransportDeparture[] }).departures ?? [];
 
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [value, selectedStop]);
+      // Filtrer par ligne si demandé
+      if (intent.lineFilter) {
+        const lf = intent.lineFilter.toLowerCase();
+        const filtered = departures.filter(
+          (d) =>
+            d.lineName.toLowerCase().includes(lf) ||
+            d.lineCode.toLowerCase().includes(lf) ||
+            d.mode.toLowerCase().includes(lf)
+        );
+        if (filtered.length > 0) departures = filtered;
+      }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!open) return;
+      if (departures.length === 0) {
+        return `Aucun départ trouvé à « ${stop.name} » pour le moment.`;
+      }
 
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, suggestions.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && activeIndex >= 0) {
-      e.preventDefault();
-      const stop = suggestions[activeIndex];
-      if (stop) selectStop(stop);
-    } else if (e.key === "Escape") {
-      setOpen(false);
-      setActiveIndex(-1);
+      const lines = departures
+        .slice(0, 4)
+        .map(departureToText)
+        .join(". ");
+      return `À ${stop.name} : ${lines}.`;
     }
-  }
 
-  function selectStop(stop: TransportStop) {
-    onSelect(stop);
-    setSuggestions([]);
-    setOpen(false);
-    setActiveIndex(-1);
-  }
+    // ------------------------------------------------------------------
+    // Départs SNCF
+    // ------------------------------------------------------------------
+    case "departures_sncf": {
+      const stops = await fetchStops(intent.stationQuery);
+      const sncfStop = stops.find(
+        (s) => s.id.includes("SNCF") || s.label?.toLowerCase().includes("gare")
+      ) ?? stops[0];
+      if (!sncfStop) {
+        return `Je n'ai pas trouvé la gare « ${intent.stationQuery} ». Essayez le nom complet, ex: « Paris Gare de Lyon ».`;
+      }
+      const res = await fetch(
+        `/api/transport/sncf/departures?stop_id=${encodeURIComponent(sncfStop.id)}&count=5`
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const departures: TrainDeparture[] = (data as { departures: TrainDeparture[] }).departures ?? [];
 
+      if (departures.length === 0) {
+        return `Aucun départ de train trouvé depuis « ${sncfStop.name} » pour le moment.`;
+      }
+
+      const lines = departures
+        .slice(0, 4)
+        .map(trainDepartureToText)
+        .join(". ");
+      return `Depuis ${sncfStop.name} : ${lines}.`;
+    }
+
+    // ------------------------------------------------------------------
+    // Perturbations
+    // ------------------------------------------------------------------
+    case "disruptions": {
+      const lines = await fetchLines(intent.lineQuery);
+      if (lines.length === 0) {
+        return `Je n'ai pas trouvé la ligne « ${intent.lineQuery} » dans le réseau Île-de-France. Essayez « Métro 13 », « RER A », « Tramway 3b »…`;
+      }
+      const line = lines[0];
+      const res = await fetch(
+        `/api/transport/idfm/disruptions?line_id=${encodeURIComponent(line.id)}`
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const disruptions: TransportDisruption[] = (data as { disruptions: TransportDisruption[] }).disruptions ?? [];
+
+      if (disruptions.length === 0) {
+        return `Bonne nouvelle ! Aucune perturbation active sur ${line.mode} ${line.code} (${line.name}).`;
+      }
+
+      const active = disruptions.filter((d) => d.status === "active");
+      const future = disruptions.filter((d) => d.status === "future");
+      let reply = `${line.mode} ${line.code} — `;
+
+      if (active.length > 0) {
+        reply += `${active.length} perturbation${active.length > 1 ? "s" : ""} en cours : `;
+        reply += active
+          .slice(0, 2)
+          .map(disruptionToText)
+          .join(". ");
+        reply += ".";
+      }
+      if (future.length > 0) {
+        reply += ` Et ${future.length} perturbation${future.length > 1 ? "s" : ""} à venir.`;
+      }
+      return reply;
+    }
+
+    // ------------------------------------------------------------------
+    // Itinéraire A→B
+    // ------------------------------------------------------------------
+    case "journey": {
+      const [fromStops, toStops] = await Promise.all([
+        fetchStops(intent.fromQuery),
+        fetchStops(intent.toQuery),
+      ]);
+      if (fromStops.length === 0) {
+        return `Je n'ai pas trouvé le point de départ « ${intent.fromQuery} ». Précisez le nom de l'arrêt ou de l'adresse.`;
+      }
+      if (toStops.length === 0) {
+        return `Je n'ai pas trouvé la destination « ${intent.toQuery} ». Précisez le nom de l'arrêt ou de l'adresse.`;
+      }
+      const from = fromStops[0];
+      const to = toStops[0];
+      const res = await fetch(
+        `/api/transport/journey?from=${encodeURIComponent(from.id)}&to=${encodeURIComponent(to.id)}`
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const journeys: TransportJourney[] = (data as { journeys: TransportJourney[] }).journeys ?? [];
+
+      if (journeys.length === 0) {
+        return `Aucun itinéraire trouvé de « ${from.name} » vers « ${to.name} ».`;
+      }
+
+      const best = journeys[0];
+      const others =
+        journeys.length > 1
+          ? ` Il y a aussi ${journeys.length - 1} autre${journeys.length > 2 ? "s" : ""} itinéraire${journeys.length > 2 ? "s" : ""}.`
+          : "";
+      return `De ${from.name} à ${to.name} — ${journeyToSpeech(best)}${others}`;
+    }
+
+    // ------------------------------------------------------------------
+    // Intent inconnu
+    // ------------------------------------------------------------------
+    case "unknown":
+      return `Je n'ai pas compris votre demande « ${intent.originalQuery} ». Essayez par exemple : « Prochain RER A à Nation », « Perturbations ligne 13 », ou « Aller de Châtelet à La Défense ».`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Composant message
+// ---------------------------------------------------------------------------
+
+interface MsgBubbleProps {
+  msg: ChatMsg;
+}
+
+function MsgBubble({ msg }: MsgBubbleProps) {
+  const isKoraly = msg.role === "koraly";
   return (
-    <div className="relative w-full">
-      <label
-        htmlFor={id}
-        className="block text-sm font-semibold mb-1"
-        style={{ color: "var(--text-soft)" }}
-      >
-        {label}
-      </label>
-      <input
-        ref={inputRef}
-        id={id}
-        type="text"
-        autoComplete="off"
-        aria-autocomplete="list"
-        aria-expanded={open}
-        aria-controls={open ? listboxId : undefined}
-        aria-activedescendant={
-          activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
-        }
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        className="w-full rounded-lg px-4 py-3 text-base border"
+    <div
+      className={`flex ${isKoraly ? "justify-start" : "justify-end"}`}
+    >
+      <div
+        className="max-w-prose rounded-2xl px-4 py-3 text-base leading-relaxed"
         style={{
-          background: "var(--bg-surface)",
-          color: "var(--text)",
-          borderColor: "var(--border-hi)",
-          outline: "none",
+          background: isKoraly ? "var(--bg-card)" : "var(--accent)",
+          color: isKoraly ? "var(--text)" : "#fff",
+          border: isKoraly ? "1px solid var(--border)" : "none",
+          borderRadius: isKoraly
+            ? "4px 18px 18px 18px"
+            : "18px 4px 18px 18px",
         }}
-        onFocus={(e) =>
-          (e.currentTarget.style.boxShadow =
-            "0 0 0 3px var(--focus-ring)")
-        }
-        onBlurCapture={(e) => (e.currentTarget.style.boxShadow = "")}
-        placeholder={`Rechercher un arrêt ou une adresse…`}
-        aria-label={`${label} — tapez au moins 2 caractères`}
-      />
-      {loading && (
-        <span
-          className="sr-only"
-          aria-live="polite"
-        >
-          Recherche en cours…
-        </span>
-      )}
-      {open && (
-        <ul
-          id={listboxId}
-          role="listbox"
-          aria-label={`Suggestions pour ${label}`}
-          className="absolute left-0 right-0 z-20 mt-1 rounded-lg border shadow-lg overflow-hidden"
-          style={{
-            background: "var(--bg-card)",
-            borderColor: "var(--border-hi)",
-          }}
-        >
-          {suggestions.map((stop, i) => (
-            <li
-              key={stop.id}
-              id={`${listboxId}-option-${i}`}
-              role="option"
-              aria-selected={i === activeIndex}
-              onMouseDown={() => selectStop(stop)}
-              className="px-4 py-3 cursor-pointer text-sm"
-              style={{
-                background:
-                  i === activeIndex ? "var(--accent)" : undefined,
-                color:
-                  i === activeIndex ? "#fff" : "var(--text)",
-              }}
-            >
-              <span className="font-medium">{stop.name}</span>
-              {stop.label !== stop.name && (
-                <span
-                  className="block text-xs mt-0.5"
-                  style={{
-                    color:
-                      i === activeIndex
-                        ? "rgba(255,255,255,0.75)"
-                        : "var(--text-muted)",
-                  }}
-                >
-                  {stop.label}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      >
+        {msg.loading ? (
+          <span aria-label="Koraly réfléchit…" style={{ opacity: 0.6 }}>
+            …
+          </span>
+        ) : (
+          msg.text
+        )}
+      </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Composant carte d'itinéraire
+// Suggestions rapides
 // ---------------------------------------------------------------------------
 
-interface JourneyCardProps {
-  journey: TransportJourney;
-  index: number;
-  onRead: (text: string) => void;
-}
-
-function JourneyCard({ journey, index, onRead }: JourneyCardProps) {
-  const transitLegs = journey.legs.filter((l) => l.type === "transit");
-
-  return (
-    <article
-      aria-label={`Itinéraire ${index + 1} — ${formatDuration(journey.totalDuration)}, départ ${formatTime(journey.departure)}`}
-      className="rounded-xl border p-5"
-      style={{
-        background: "var(--bg-card)",
-        borderColor: "var(--border)",
-      }}
-    >
-      {/* En-tête résumé */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <span
-            className="text-2xl font-bold"
-            style={{ color: "var(--text)" }}
-          >
-            {formatDuration(journey.totalDuration)}
-          </span>
-          <span
-            className="ml-3 text-sm"
-            style={{ color: "var(--text-muted)" }}
-          >
-            {formatTime(journey.departure)} → {formatTime(journey.arrival)}
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          {journey.transfers === 0 ? (
-            <span
-              className="text-xs font-semibold px-2 py-1 rounded-full"
-              style={{
-                background: "var(--success)",
-                color: "#fff",
-              }}
-            >
-              Direct
-            </span>
-          ) : (
-            <span
-              className="text-xs font-semibold px-2 py-1 rounded-full"
-              style={{
-                background: "var(--bg-surface)",
-                color: "var(--text-soft)",
-                border: "1px solid var(--border-hi)",
-              }}
-            >
-              {journey.transfers} correspondance
-              {journey.transfers > 1 ? "s" : ""}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => onRead(journeyToSpeech(journey))}
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg"
-            style={{
-              background: "var(--accent)",
-              color: "#fff",
-              cursor: "pointer",
-            }}
-            aria-label={`Lire l'itinéraire ${index + 1} à voix haute`}
-          >
-            Lire
-          </button>
-        </div>
-      </div>
-
-      {/* Étapes */}
-      {transitLegs.length > 0 && (
-        <ol
-          aria-label="Étapes du trajet"
-          className="mt-4 space-y-2"
-        >
-          {journey.legs.map((leg, i) => (
-            <li key={i} className="flex items-start gap-3 text-sm">
-              {leg.type === "transit" ? (
-                <>
-                  <span
-                    className="mt-0.5 w-7 h-5 flex items-center justify-center rounded text-xs font-bold shrink-0"
-                    style={{
-                      background: leg.lineColor ?? "var(--accent)",
-                      color: "#fff",
-                    }}
-                    aria-hidden="true"
-                  >
-                    {leg.lineName ?? "?"}
-                  </span>
-                  <span style={{ color: "var(--text)" }}>
-                    <span className="font-medium">
-                      {leg.mode ?? "Transport"} {leg.lineName}
-                    </span>
-                    {leg.direction && (
-                      <span style={{ color: "var(--text-soft)" }}>
-                        {" "}→ {leg.direction}
-                      </span>
-                    )}
-                    {leg.stops && leg.stops.length > 0 && (
-                      <span style={{ color: "var(--text-muted)" }}>
-                        {" "}({leg.stops.length + 1} arrêts,{" "}
-                        {formatDuration(leg.duration)})
-                      </span>
-                    )}
-                  </span>
-                </>
-              ) : leg.type === "walk" ? (
-                <>
-                  <span
-                    className="mt-0.5 w-7 text-center shrink-0 text-base"
-                    aria-hidden="true"
-                  >
-                    🚶
-                  </span>
-                  <span style={{ color: "var(--text-soft)" }}>
-                    À pied — {formatDuration(leg.duration)}
-                    {leg.to && (
-                      <span style={{ color: "var(--text-muted)" }}>
-                        {" "}jusqu&apos;à {leg.to}
-                      </span>
-                    )}
-                  </span>
-                </>
-              ) : (
-                <span
-                  className="text-xs italic"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  Attente — {formatDuration(leg.duration)}
-                </span>
-              )}
-            </li>
-          ))}
-        </ol>
-      )}
-
-      {journey.fare && (
-        <p
-          className="mt-3 text-xs"
-          style={{ color: "var(--text-muted)" }}
-        >
-          Tarif indicatif : {journey.fare.amount} {journey.fare.currency}
-        </p>
-      )}
-    </article>
-  );
-}
+const SUGGESTIONS = [
+  "Prochain RER A à Nation",
+  "Perturbations ligne 13",
+  "Bus 91 à Denfert-Rochereau",
+  "Aller de Châtelet à La Défense",
+  "Perturbations RER B",
+  "Prochains trains Gare de Lyon",
+];
 
 // ---------------------------------------------------------------------------
 // Page principale
 // ---------------------------------------------------------------------------
 
 export default function TransportPage() {
-  useDocumentTitle("VoixTransport — Itinéraires accessibles par la voix");
+  useDocumentTitle("VoixTransport — Transports en commun par la voix");
 
+  const router = useRouter();
   const { prefs } = usePreferences();
-  const { speak, cancelSpeech } = useSpeech({
-    rate: SPEECH_RATE_VALUE[prefs.speechRate],
-    lang: prefs.speechLocale,
-    premiumVoice: prefs.premiumVoice,
-  });
+  const { speak, cancelSpeech, startListening, stopListening, transcript, isListening, isSpeaking, isSupported } =
+    useSpeech({
+      rate: SPEECH_RATE_VALUE[prefs.speechRate],
+      lang: prefs.speechLocale,
+      premiumVoice: prefs.premiumVoice,
+    });
 
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [helpOpen, setHelpOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [messages, setMessages] = useState<ChatMsg[]>([
+    {
+      id: "welcome",
+      role: "koraly",
+      text: "Bonjour ! Je suis Koraly. Posez-moi une question sur les transports en commun d'Île-de-France. Par exemple : « Prochain RER A à Nation ? » ou « Perturbations ligne 13 ? »",
+    },
+  ]);
+  const [inputText, setInputText] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  // Inputs
-  const fromId = useId();
-  const toId = useId();
-  const [fromText, setFromText] = useState("");
-  const [toText, setToText] = useState("");
-  const [fromStop, setFromStop] = useState<TransportStop | null>(null);
-  const [toStop, setToStop] = useState<TransportStop | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const prevTranscriptRef = useRef("");
 
-  // Résultats
-  const [journeys, setJourneys] = useState<TransportJourney[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const resultsRef = useRef<HTMLDivElement>(null);
+  // Scroll en bas du chat à chaque nouveau message
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-  // Réinitialise le stop sélectionné si l'utilisateur modifie le texte
-  function handleFromChange(text: string) {
-    setFromText(text);
-    if (fromStop && text !== fromStop.name) setFromStop(null);
-  }
-  function handleToChange(text: string) {
-    setToText(text);
-    if (toStop && text !== toStop.name) setToStop(null);
-  }
-
-  function handleFromSelect(stop: TransportStop) {
-    setFromStop(stop);
-    setFromText(stop.name);
-  }
-  function handleToSelect(stop: TransportStop) {
-    setToStop(stop);
-    setToText(stop.name);
-  }
-
-  function swapStops() {
-    setFromText(toText);
-    setToText(fromText);
-    setFromStop(toStop);
-    setToStop(fromStop);
-  }
-
-  const searchJourneys = useCallback(async () => {
-    if (!fromStop || !toStop) return;
-
-    setLoading(true);
-    setError(null);
-    setJourneys([]);
-    setAnnouncement("Calcul de l'itinéraire en cours…");
-
-    try {
-      const res = await fetch(
-        `/api/transport/journey?from=${encodeURIComponent(fromStop.id)}&to=${encodeURIComponent(toStop.id)}`
-      );
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          (data as { error?: string }).error ?? `HTTP ${res.status}`
-        );
-      }
-      const data = await res.json();
-      const results: TransportJourney[] = data.journeys ?? [];
-      setJourneys(results);
-
-      if (results.length === 0) {
-        setAnnouncement("Aucun itinéraire trouvé pour ce trajet.");
-      } else {
-        const count = results.length;
-        setAnnouncement(
-          `${count} itinéraire${count > 1 ? "s" : ""} trouvé${count > 1 ? "s" : ""}. Le plus rapide : ${formatDuration(results[0].totalDuration)}, départ à ${formatTime(results[0].departure)}.`
-        );
-        // Focus les résultats
-        setTimeout(
-          () => resultsRef.current?.focus(),
-          100
-        );
-      }
-    } catch (err) {
-      console.error("[transport] searchJourneys failed:", err);
-      const msg =
-        err instanceof Error ? err.message : "Erreur inconnue.";
-      setError(msg);
-      setAnnouncement(`Erreur : ${msg}`);
-    } finally {
-      setLoading(false);
+  // Quand la reconnaissance vocale produit un transcript, l'injecter dans l'input
+  useEffect(() => {
+    if (transcript && transcript !== prevTranscriptRef.current) {
+      prevTranscriptRef.current = transcript;
+      setInputText(transcript);
     }
-  }, [fromStop, toStop]);
+  }, [transcript]);
 
-  // Soumission via Entrée dans les champs
+  // Quand la reconnaissance s'arrête avec un transcript valide → soumettre
+  useEffect(() => {
+    if (!isListening && inputText.trim() && inputText === transcript) {
+      submitQuery(inputText);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isListening]);
+
+  // Statut orbe Koraly
+  const orbStatus: KoralyOrbStatus = isListening
+    ? "listening"
+    : isSpeaking
+    ? "speaking"
+    : "idle";
+
+  // ---------------------------------------------------------------------------
+  // Soumission d'une requête
+  // ---------------------------------------------------------------------------
+
+  const submitQuery = useCallback(
+    async (query: string) => {
+      const q = query.trim();
+      if (!q || busy) return;
+
+      const userMsgId = crypto.randomUUID();
+      const koralyMsgId = crypto.randomUUID();
+
+      setMessages((prev) => [
+        ...prev,
+        { id: userMsgId, role: "user", text: q },
+        { id: koralyMsgId, role: "koraly", text: "", loading: true },
+      ]);
+      setInputText("");
+      prevTranscriptRef.current = "";
+      setBusy(true);
+      setAnnouncement("Koraly réfléchit…");
+
+      try {
+        const intent = parseIntent(q);
+        const answer = await handleIntent(intent);
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === koralyMsgId ? { ...m, text: answer, loading: false } : m
+          )
+        );
+        setAnnouncement(answer);
+
+        if (voiceEnabled) {
+          cancelSpeech();
+          speak(answer).catch((err) =>
+            console.warn("[transport] speak failed:", err)
+          );
+        }
+      } catch (err) {
+        console.error("[transport] handleIntent failed:", err);
+        const errText =
+          "Une erreur s'est produite lors de la recherche. Veuillez réessayer.";
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === koralyMsgId
+              ? { ...m, text: errText, loading: false }
+              : m
+          )
+        );
+        setAnnouncement(errText);
+      } finally {
+        setBusy(false);
+        // Redonner le focus au champ de saisie
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
+    },
+    [busy, voiceEnabled, speak, cancelSpeech]
+  );
+
   function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (fromStop && toStop) {
-      searchJourneys();
+    submitQuery(inputText);
+  }
+
+  function toggleMic() {
+    if (isListening) {
+      stopListening();
+    } else {
+      cancelSpeech();
+      setInputText("");
+      startListening();
     }
   }
 
-  function readJourney(text: string) {
-    if (!voiceEnabled) return;
-    cancelSpeech();
-    speak(text).catch((err) =>
-      console.warn("[transport] speak failed:", err)
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // Raccourcis clavier
+  // ---------------------------------------------------------------------------
 
-  const canSearch = Boolean(fromStop && toStop);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    function handler(e: KeyboardEvent) {
+      if (helpOpen) return;
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      const target = e.target as HTMLElement | null;
+      const inInput =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable;
+
+      // V = micro (seulement hors champ de saisie)
+      if ((e.key === "v" || e.key === "V") && !inInput && isSupported) {
+        e.preventDefault();
+        toggleMic();
+        return;
+      }
+
+      // Échap = stop parole
+      if (e.key === "Escape") {
+        cancelSpeech();
+        if (isListening) stopListening();
+        return;
+      }
+
+      // Navigation : Retour arrière depuis le champ → page précédente si vide
+      if (e.key === "Backspace" && inInput) {
+        const inp = target as HTMLInputElement;
+        if (inp.value === "") {
+          router.push("/");
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [helpOpen, isSupported, isListening, cancelSpeech, stopListening, router, toggleMic]);
 
   return (
     <>
@@ -540,138 +606,177 @@ export default function TransportPage() {
       <main
         id="main"
         tabIndex={-1}
-        className="min-h-screen px-4 py-10 max-w-2xl mx-auto"
+        className="flex flex-col min-h-screen px-4 py-8 max-w-2xl mx-auto"
         style={{ outline: "none" }}
       >
-        <h1 className="vc-h1 mb-2">
-          VoixTransport
-        </h1>
+        <h1 className="vc-h1 mb-1">VoixTransport</h1>
         <p
-          className="mb-8 text-base"
+          className="mb-6 text-sm"
           style={{ color: "var(--text-soft)" }}
         >
-          Calculez votre itinéraire en transports en commun, accessible par la voix.
+          Transports en commun Île-de-France — consultez par la voix ou par écrit.
         </p>
 
-        {/* Formulaire de recherche */}
-        <form
-          onSubmit={handleFormSubmit}
-          aria-label="Recherche d'itinéraire"
-          className="space-y-4"
-          noValidate
+        {/* Koraly orb + état */}
+        <div
+          className="flex flex-col items-center mb-6"
+          role="region"
+          aria-label="Statut de Koraly"
         >
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex-1">
-              <StopCombobox
-                id={fromId}
-                label="Départ"
-                value={fromText}
-                selectedStop={fromStop}
-                onChange={handleFromChange}
-                onSelect={handleFromSelect}
-              />
-            </div>
+          <KoralyOrb status={orbStatus} size={120} />
+          <p
+            className="mt-3 text-sm font-semibold"
+            style={{ color: "var(--text-muted)" }}
+            aria-hidden="true"
+          >
+            {isListening
+              ? "Koraly vous écoute… parlez maintenant"
+              : isSpeaking
+              ? "Koraly répond…"
+              : "Koraly est prête"}
+          </p>
+        </div>
 
+        {/* Suggestions rapides */}
+        <div
+          role="group"
+          aria-label="Exemples de questions"
+          className="flex flex-wrap gap-2 mb-6"
+        >
+          {SUGGESTIONS.map((s) => (
             <button
+              key={s}
               type="button"
-              onClick={swapStops}
-              aria-label="Inverser départ et arrivée"
-              className="px-3 py-2 rounded-lg text-xl shrink-0 self-end sm:self-auto sm:mb-0"
+              onClick={() => submitQuery(s)}
+              disabled={busy}
+              className="text-xs px-3 py-1.5 rounded-full font-medium"
               style={{
                 background: "var(--bg-surface)",
                 color: "var(--text-soft)",
                 border: "1px solid var(--border-hi)",
-                cursor: "pointer",
-                lineHeight: 1,
+                cursor: busy ? "not-allowed" : "pointer",
+                opacity: busy ? 0.5 : 1,
               }}
             >
-              ⇅
+              {s}
             </button>
+          ))}
+        </div>
 
-            <div className="flex-1">
-              <StopCombobox
-                id={toId}
-                label="Arrivée"
-                value={toText}
-                selectedStop={toStop}
-                onChange={handleToChange}
-                onSelect={handleToSelect}
-              />
-            </div>
-          </div>
+        {/* Fil de conversation */}
+        <section
+          aria-label="Conversation avec Koraly"
+          aria-live="polite"
+          aria-relevant="additions"
+          className="flex-1 flex flex-col gap-3 mb-6 min-h-[200px] overflow-y-auto"
+          style={{
+            maxHeight: "40vh",
+            paddingBottom: "0.5rem",
+          }}
+        >
+          {messages.map((msg) => (
+            <MsgBubble key={msg.id} msg={msg} />
+          ))}
+          <div ref={chatEndRef} aria-hidden="true" />
+        </section>
 
+        {/* Zone de saisie */}
+        <form
+          onSubmit={handleFormSubmit}
+          aria-label="Poser une question à Koraly"
+          className="flex items-center gap-2"
+        >
+          <label htmlFor="koraly-input" className="sr-only">
+            Votre question (transports en commun)
+          </label>
+          <input
+            ref={inputRef}
+            id="koraly-input"
+            type="text"
+            autoComplete="off"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            disabled={busy}
+            placeholder={
+              isListening
+                ? "Parlez maintenant…"
+                : "Posez votre question…"
+            }
+            aria-label="Question à Koraly — ex: Prochain RER A à Nation"
+            className="flex-1 rounded-xl px-4 py-3 text-base border"
+            style={{
+              background: "var(--bg-surface)",
+              color: "var(--text)",
+              borderColor: isListening ? "var(--brass)" : "var(--border-hi)",
+              outline: "none",
+              boxShadow: isListening ? "0 0 0 3px rgba(181,136,66,0.3)" : undefined,
+            }}
+            onFocus={(e) =>
+              (e.currentTarget.style.boxShadow = isListening
+                ? "0 0 0 3px rgba(181,136,66,0.3)"
+                : "0 0 0 3px var(--focus-ring)")
+            }
+            onBlur={(e) => (e.currentTarget.style.boxShadow = "")}
+          />
+
+          {/* Bouton micro */}
+          {isSupported && (
+            <button
+              type="button"
+              onClick={toggleMic}
+              disabled={busy}
+              aria-label={
+                isListening
+                  ? "Arrêter la reconnaissance vocale (raccourci V)"
+                  : "Activer la reconnaissance vocale (raccourci V)"
+              }
+              aria-pressed={isListening}
+              className="rounded-xl px-3 py-3 shrink-0"
+              style={{
+                background: isListening ? "var(--brass)" : "var(--bg-surface)",
+                color: isListening ? "#fff" : "var(--text-soft)",
+                border: "1px solid var(--border-hi)",
+                cursor: busy ? "not-allowed" : "pointer",
+                fontSize: "1.25rem",
+                lineHeight: 1,
+                opacity: busy ? 0.5 : 1,
+              }}
+            >
+              🎤
+            </button>
+          )}
+
+          {/* Bouton envoi */}
           <button
             type="submit"
-            disabled={!canSearch || loading}
-            aria-busy={loading}
-            className="w-full py-3 rounded-xl font-semibold text-base"
+            disabled={!inputText.trim() || busy}
+            aria-label="Envoyer la question"
+            className="rounded-xl px-4 py-3 font-semibold text-sm shrink-0"
             style={{
-              background: canSearch ? "var(--accent)" : "var(--bg-surface)",
-              color: canSearch ? "#fff" : "var(--text-muted)",
-              border: canSearch
-                ? "none"
-                : "1px solid var(--border-hi)",
-              cursor: canSearch && !loading ? "pointer" : "not-allowed",
-              transition: "background 0.2s",
+              background:
+                inputText.trim() && !busy ? "var(--accent)" : "var(--bg-surface)",
+              color: inputText.trim() && !busy ? "#fff" : "var(--text-muted)",
+              border:
+                inputText.trim() && !busy
+                  ? "none"
+                  : "1px solid var(--border-hi)",
+              cursor: inputText.trim() && !busy ? "pointer" : "not-allowed",
             }}
           >
-            {loading ? "Calcul en cours…" : "Calculer l'itinéraire"}
+            Envoyer
           </button>
         </form>
 
-        {/* Erreur */}
-        {error && (
-          <div
-            role="alert"
-            className="mt-6 rounded-xl p-4 text-sm"
-            style={{
-              background: "color-mix(in srgb, var(--danger) 10%, transparent)",
-              color: "var(--danger)",
-              border: "1px solid var(--danger)",
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {/* Résultats */}
-        {journeys.length > 0 && (
-          <section
-            aria-label={`${journeys.length} itinéraire${journeys.length > 1 ? "s" : ""} trouvé${journeys.length > 1 ? "s" : ""}`}
-            ref={resultsRef}
-            tabIndex={-1}
-            className="mt-8 space-y-4"
-            style={{ outline: "none" }}
-          >
-            <h2
-              className="vc-h2 mb-4"
-              id="results-heading"
-            >
-              {journeys.length} itinéraire
-              {journeys.length > 1 ? "s" : ""} trouvé
-              {journeys.length > 1 ? "s" : ""}
-            </h2>
-            {journeys.map((journey, i) => (
-              <JourneyCard
-                key={journey.id}
-                journey={journey}
-                index={i}
-                onRead={readJourney}
-              />
-            ))}
-          </section>
-        )}
-
-        {/* État initial — invitation */}
-        {!loading && journeys.length === 0 && !error && (
-          <div
-            className="mt-12 text-center text-base"
-            style={{ color: "var(--text-muted)" }}
-            aria-hidden="true"
-          >
-            Entrez un départ et une arrivée pour calculer votre itinéraire.
-          </div>
-        )}
+        {/* Légende raccourcis */}
+        <p
+          className="mt-4 text-xs"
+          style={{ color: "var(--text-muted)" }}
+          aria-hidden="true"
+        >
+          Raccourcis :{" "}
+          <kbd>V</kbd> = micro ·{" "}
+          <kbd>Échap</kbd> = stop · Limite V1 : bus hors IdF non couverts
+        </p>
       </main>
 
       <Footer />

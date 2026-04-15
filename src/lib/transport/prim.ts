@@ -318,6 +318,31 @@ export async function getLineInfo(lineId: string): Promise<TransportLineInfo> {
 }
 
 /**
+ * Recherche de lignes de transport par code ou nom (Navitia IDFM).
+ * @param query  Code court (ex: "13", "A") ou nom de ligne
+ */
+export async function searchLine(query: string): Promise<TransportLineInfo[]> {
+  const params = new URLSearchParams({
+    q: query,
+    count: "8",
+  });
+
+  const data = await primFetch<{ lines?: PrimLine[] }>(
+    `navitia/coverage/fr-idf/lines?${params}`
+  );
+
+  return (data.lines ?? []).map((l) => ({
+    id: l.id,
+    name: l.name,
+    code: l.code,
+    mode: l.commercial_mode.name,
+    network: l.network.name,
+    color: l.color || undefined,
+    textColor: l.text_color || undefined,
+  }));
+}
+
+/**
  * Perturbations actives ou futures pour une ligne IDFM.
  * @param lineId  Identifiant Navitia (ex: "line:IDFM:C01371")
  */
