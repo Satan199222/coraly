@@ -208,7 +208,7 @@ export default function TarifsPage() {
                 </p>
 
                 <a
-                  href="mailto:pro@coraly.fr"
+                  href="mailto:hello@coraly.fr"
                   className="block w-full text-center py-4 rounded-lg text-[16px] font-bold border-2 transition-opacity hover:opacity-90 focus:outline-none focus:ring-4 focus:ring-[var(--focus-ring)] focus:ring-offset-2"
                   style={{ borderColor: "var(--brass)", color: "var(--brass)", background: "transparent" }}
                 >

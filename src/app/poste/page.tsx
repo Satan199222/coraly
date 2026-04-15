@@ -610,7 +610,7 @@ export default function PostePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: `VoixPoste-LRE-${Date.now()}`,
-          senderEmail: "voixposte@coraly.fr",
+          senderEmail: "hello@coraly.fr",
           recipientEmail: lreDraft.recipientEmail,
           recipientName: lreDraft.recipientName,
           body: lreDraft.body,

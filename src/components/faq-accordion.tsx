@@ -35,7 +35,7 @@ export function FaqAccordion() {
         >
           Les questions qu&apos;on nous pose le plus souvent. Si la vôtre n&apos;y est pas,{" "}
           <a
-            href="mailto:contact@coraly.fr"
+            href="mailto:hello@coraly.fr"
             className="underline"
             style={{ color: "var(--accent)" }}
           >

@@ -144,11 +144,11 @@ export default function BetaPage() {
             >
               Une question ou un retour ?{" "}
               <a
-                href="mailto:beta@coraly.fr"
+                href="mailto:hello@coraly.fr"
                 className="font-semibold underline underline-offset-2"
                 style={{ color: "var(--brass)" }}
               >
-                beta@coraly.fr
+                hello@coraly.fr
               </a>
             </p>
           </div>

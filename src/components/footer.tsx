@@ -10,12 +10,12 @@ const COL_A11Y = [
   { label: "Déclaration de conformité", href: "/accessibilite" },
   { label: "Raccourcis clavier", href: "/accessibilite#raccourcis" },
   { label: "Police Luciole", href: "https://www.luciole-vision.com/", external: true },
-  { label: "Signaler un problème", href: "mailto:contact@coraly.fr" },
+  { label: "Signaler un problème", href: "mailto:hello@coraly.fr" },
 ];
 const COL_COMPANY = [
   { label: "À propos", href: "/a-propos" },
   { label: "Presse", href: "/presse" },
-  { label: "Contact", href: "mailto:contact@coraly.fr" },
+  { label: "Contact", href: "mailto:hello@coraly.fr" },
   { label: "Partenaires enseignes", href: "/b2b" },
 ];
 
