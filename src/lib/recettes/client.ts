@@ -1,27 +1,34 @@
 /**
  * Client API VoixRecettes
  *
- * Stratégie (GROA-253/254) :
- *   - Si SPOONACULAR_API_KEY est défini → Spoonacular (meilleure couverture FR avec clé)
- *   - Sinon → TheMealDB free tier (28 recettes cuisine française, sans clé)
+ * Chaîne de priorité (GROA-254 rev.2 — retour Board) :
+ *   1. Spoonacular  — si SPOONACULAR_API_KEY défini (150 req/j free, meilleure couverture FR)
+ *   2. Edamam       — si EDAMAM_APP_ID + EDAMAM_APP_KEY définis (10 000 req/mois free, lang=fr)
+ *   3. TheMealDB    — free tier sans clé (fallback dernière chance, ~28 recettes FR)
+ *
+ * Obtenir une clé Edamam : https://developer.edamam.com/edamam-recipe-api (plan Developer free)
  *
  * Toutes les fonctions retournent des types unifiés (RecipeSummary, Recipe).
  * GROA-254 — Phase 5b VoixRecettes
  */
 
 import type {
+  EdamamDetailResponse,
+  EdamamRecipe,
+  EdamamSearchResponse,
+  MealDbMeal,
+  MealDbSearchResponse,
   Recipe,
   RecipeIngredient,
   RecipeSummary,
   RecipeStep,
   SpoonacularRecipeDetail,
   SpoonacularSearchResult,
-  MealDbMeal,
-  MealDbSearchResponse,
 } from "./types";
 
 const TIMEOUT_MS = 12_000;
 const SPOON_BASE = "https://api.spoonacular.com";
+const EDAMAM_BASE = "https://api.edamam.com/api/recipes/v2";
 const MEALDB_BASE = "https://www.themealdb.com/api/json/v1/1";
 
 // ---------------------------------------------------------------------------
@@ -45,6 +52,18 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 function spoonKey(): string {
   return process.env.SPOONACULAR_API_KEY ?? "";
+}
+
+function edamamKeys(): { appId: string; appKey: string } | null {
+  const appId = process.env.EDAMAM_APP_ID ?? "";
+  const appKey = process.env.EDAMAM_APP_KEY ?? "";
+  return appId && appKey ? { appId, appKey } : null;
+}
+
+/** Extrait l'ID court depuis l'URI Edamam "recipe_XXXX" → "edm-XXXX". */
+function edamamUriToId(uri: string): string {
+  const shortId = uri.split("recipe_").pop() ?? uri;
+  return `edm-${shortId}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,9 +98,8 @@ function spoonDetailToUnified(r: SpoonacularRecipeDetail): Recipe {
     }
   }
 
-  // Fallback : découper les instructions en prose par ". " ou "\n"
   if (steps.length === 0 && r.instructions) {
-    const raw = r.instructions.replace(/<[^>]+>/g, ""); // strip HTML
+    const raw = r.instructions.replace(/<[^>]+>/g, "");
     const parts = raw
       .split(/(?:\.\s+|\n+)/)
       .map((s) => s.trim())
@@ -96,6 +114,50 @@ function spoonDetailToUnified(r: SpoonacularRecipeDetail): Recipe {
     ingredients,
     sourceUrl: r.sourceUrl,
     tags: r.diets,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Edamam helpers
+// ---------------------------------------------------------------------------
+
+function edamamToSummary(r: EdamamRecipe): RecipeSummary {
+  return {
+    id: edamamUriToId(r.uri),
+    title: r.label,
+    imageUrl: r.image,
+    category: r.dishType?.[0] ?? r.mealType?.[0],
+    area: r.cuisineType?.[0],
+    readyInMinutes: r.totalTime && r.totalTime > 0 ? r.totalTime : undefined,
+    servings: r.yield,
+    source: "edamam",
+  };
+}
+
+function edamamToRecipe(r: EdamamRecipe): Recipe {
+  // Ingrédients depuis ingredientLines (texte brut, plus lisible)
+  const ingredients: RecipeIngredient[] = (r.ingredientLines ?? []).map(
+    (line) => ({ name: line, amount: "" })
+  );
+
+  // Edamam ne fournit pas les étapes de préparation — on renvoie vers la source
+  const sourceLabel = r.source ?? "la source originale";
+  const steps: RecipeStep[] = r.url
+    ? [
+        {
+          number: 1,
+          text: `Les étapes détaillées de cette recette sont disponibles sur ${sourceLabel}. Accédez au lien ci-dessous pour suivre la préparation complète.`,
+        },
+      ]
+    : [];
+
+  return {
+    ...edamamToSummary(r),
+    instructionsRaw: undefined,
+    steps,
+    ingredients,
+    sourceUrl: r.url,
+    tags: r.dietLabels,
   };
 }
 
@@ -115,7 +177,6 @@ function mealToSummary(m: MealDbMeal): RecipeSummary {
 }
 
 function mealToRecipe(m: MealDbMeal): Recipe {
-  // Ingrédients : strIngredient1..20 + strMeasure1..20
   const ingredients: RecipeIngredient[] = [];
   for (let i = 1; i <= 20; i++) {
     const name = (m[`strIngredient${i}`] ?? "").trim();
@@ -125,7 +186,6 @@ function mealToRecipe(m: MealDbMeal): Recipe {
     }
   }
 
-  // Étapes : découper strInstructions par saut de ligne ou numéro de liste
   const rawInstructions = m.strInstructions ?? "";
   const paragraphs = rawInstructions
     .split(/\r?\n+/)
@@ -160,17 +220,17 @@ function mealToRecipe(m: MealDbMeal): Recipe {
 
 /**
  * Recherche de recettes par terme.
- * Utilise Spoonacular si SPOONACULAR_API_KEY est défini, TheMealDB sinon.
+ * Priorité : Spoonacular → Edamam → TheMealDB.
  */
 export async function searchRecipes(query: string): Promise<RecipeSummary[]> {
-  const key = spoonKey();
-
-  if (key) {
+  // 1. Spoonacular
+  const spoonApiKey = spoonKey();
+  if (spoonApiKey) {
     const url =
       `${SPOON_BASE}/recipes/complexSearch` +
       `?query=${encodeURIComponent(query)}` +
       `&language=fr&number=8&addRecipeInformation=true` +
-      `&instructionsRequired=false&apiKey=${key}`;
+      `&instructionsRequired=false&apiKey=${spoonApiKey}`;
 
     const data = await fetchJson<SpoonacularSearchResult>(url);
     return (data.results ?? []).map((r) =>
@@ -178,7 +238,21 @@ export async function searchRecipes(query: string): Promise<RecipeSummary[]> {
     );
   }
 
-  // TheMealDB fallback
+  // 2. Edamam
+  const edamam = edamamKeys();
+  if (edamam) {
+    const url =
+      `${EDAMAM_BASE}?type=public` +
+      `&q=${encodeURIComponent(query)}` +
+      `&app_id=${edamam.appId}` +
+      `&app_key=${edamam.appKey}` +
+      `&lang=fr&from=0&to=8`;
+
+    const data = await fetchJson<EdamamSearchResponse>(url);
+    return (data.hits ?? []).map((h) => edamamToSummary(h.recipe));
+  }
+
+  // 3. TheMealDB (fallback dernier recours)
   const url = `${MEALDB_BASE}/search.php?s=${encodeURIComponent(query)}`;
   const data = await fetchJson<MealDbSearchResponse>(url);
   return (data.meals ?? []).map(mealToSummary);
@@ -190,11 +264,10 @@ export async function searchRecipes(query: string): Promise<RecipeSummary[]> {
 
 /**
  * Détail complet d'une recette par son identifiant.
- * Les IDs TheMealDB sont préfixés par "mdb-".
+ * Préfixes : "edm-" = Edamam, "mdb-" = TheMealDB, sinon = Spoonacular.
  */
 export async function getRecipe(id: string): Promise<Recipe> {
-  const key = spoonKey();
-
+  // TheMealDB
   if (id.startsWith("mdb-")) {
     const mealId = id.slice(4);
     const url = `${MEALDB_BASE}/lookup.php?i=${encodeURIComponent(mealId)}`;
@@ -204,15 +277,32 @@ export async function getRecipe(id: string): Promise<Recipe> {
     return mealToRecipe(meal);
   }
 
-  if (!key) {
+  // Edamam
+  if (id.startsWith("edm-")) {
+    const edamam = edamamKeys();
+    if (!edamam) {
+      throw new Error(
+        "[recettes] EDAMAM_APP_ID + EDAMAM_APP_KEY requis pour les IDs Edamam."
+      );
+    }
+    const recipeId = id.slice(4);
+    const url =
+      `${EDAMAM_BASE}/${encodeURIComponent(recipeId)}?type=public` +
+      `&app_id=${edamam.appId}&app_key=${edamam.appKey}`;
+    const data = await fetchJson<EdamamDetailResponse>(url);
+    return edamamToRecipe(data.recipe);
+  }
+
+  // Spoonacular
+  const spoonApiKey = spoonKey();
+  if (!spoonApiKey) {
     throw new Error(
       "[recettes] SPOONACULAR_API_KEY requis pour les IDs Spoonacular."
     );
   }
-
   const url =
     `${SPOON_BASE}/recipes/${encodeURIComponent(id)}/information` +
-    `?includeNutrition=false&apiKey=${key}`;
+    `?includeNutrition=false&apiKey=${spoonApiKey}`;
   const data = await fetchJson<SpoonacularRecipeDetail>(url);
   return spoonDetailToUnified(data);
 }
