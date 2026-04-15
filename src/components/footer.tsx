@@ -54,8 +54,9 @@ export function Footer() {
               className="mt-5 text-[15px] leading-[1.6] max-w-[320px]"
               style={{ color: "rgba(244,238,227,0.7)" }}
             >
-              L&apos;assistante vocale d&apos;accessibilité pour les courses en ligne. Conçue en
-              France avec des utilisateurs déficients visuels.
+              L&apos;assistante vocale d&apos;accessibilité pour le quotidien : courses, TV,
+              transport, poste, santé, recettes. Conçue en France avec des utilisateurs
+              déficients visuels.
             </p>
           </div>
           <FooterCol title="Produit" items={COL_PRODUIT} />

@@ -13,17 +13,18 @@ const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Coraly — Vos courses par la voix",
+    default: "Coraly — Votre assistante vocale du quotidien",
     template: "%s — Coraly",
   },
   description:
-    "Faites vos courses en ligne par la voix. Dictez, Koraly compose votre panier. Accessible aux non-voyants, malvoyants et seniors.",
+    "Coraly rend le quotidien accessible par la voix : courses, TV, transport, poste, santé, recettes. Conçue pour les personnes non-voyantes, malvoyantes et seniors.",
   keywords: [
+    "accessibilité vocale quotidien",
+    "assistante vocale malvoyants",
     "courses en ligne accessibles",
-    "dictée vocale courses",
-    "application courses malvoyants",
-    "shopping vocal senior",
-    "accessibilité numérique courses",
+    "programmes TV vocaux",
+    "transport accessible",
+    "application senior accessible",
     "Coraly",
     "Koraly",
     "RGAA AAA",
@@ -50,15 +51,15 @@ export const metadata: Metadata = {
     locale: "fr_FR",
     url: SITE_URL,
     siteName: "Coraly",
-    title: "Coraly — Vos courses par la voix",
+    title: "Coraly — Votre assistante vocale du quotidien",
     description:
-      "Faites vos courses en ligne par la voix. Dictez, Koraly compose votre panier. Accessible aux non-voyants, malvoyants et seniors.",
+      "Coraly rend le quotidien accessible par la voix : courses, TV, transport, poste, santé, recettes. Conçue pour les personnes non-voyantes, malvoyantes et seniors.",
     images: [
       {
         url: "/images/og-default.jpg",
         width: 1200,
         height: 630,
-        alt: "Coraly — Application de courses vocale accessible",
+        alt: "Coraly — Assistante vocale accessible pour le quotidien",
       },
     ],
   },
@@ -66,9 +67,9 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@coraly",
     creator: "@coraly",
-    title: "Coraly — Vos courses par la voix",
+    title: "Coraly — Votre assistante vocale du quotidien",
     description:
-      "Faites vos courses en ligne par la voix. Dictez, Koraly compose votre panier. Accessible aux non-voyants, malvoyants et seniors.",
+      "Coraly rend le quotidien accessible par la voix : courses, TV, transport, poste, santé, recettes. Conçue pour les personnes non-voyantes, malvoyantes et seniors.",
     images: ["/images/og-default.jpg"],
   },
 };
@@ -81,17 +82,20 @@ const jsonLd = {
       name: "Coraly",
       url: SITE_URL,
       description:
-        "Application de courses en ligne accessibles par commande vocale. Conçue pour les personnes non-voyantes, malvoyantes et seniors.",
-      applicationCategory: "ShoppingApplication",
+        "Assistante vocale du quotidien : courses, TV, transport, poste, santé, recettes. Conçue pour les personnes non-voyantes, malvoyantes et seniors.",
+      applicationCategory: "LifestyleApplication",
       operatingSystem: "Web, Chrome Extension",
       inLanguage: "fr",
       availableOnDevice: ["Desktop", "Mobile"],
       featureList: [
-        "Commande vocale des courses",
+        "Courses en ligne par la voix",
+        "Programmes TV lus par Koraly",
+        "Horaires et itinéraires transport",
+        "Suivi colis et courrier postal",
+        "Recherche médicaments et santé",
+        "Recettes pas à pas guidées",
         "Synthèse vocale Koraly",
         "Mode clavier accessible WCAG AAA",
-        "Mode conversation IA",
-        "Extension Chrome",
         "Compatible lecteurs d'écran",
       ],
       accessibilityFeature: [
@@ -123,7 +127,7 @@ const jsonLd = {
       name: "GROUPE J",
       url: SITE_URL,
       description:
-        "Éditeur de Coraly, application de courses vocale accessible.",
+        "Éditeur de Coraly, assistante vocale accessible pour le quotidien.",
       contactPoint: {
         "@type": "ContactPoint",
         contactType: "customer support",
@@ -135,7 +139,7 @@ const jsonLd = {
       "@id": `${SITE_URL}/#website`,
       url: SITE_URL,
       name: "Coraly",
-      description: "Application de courses accessibles par la voix",
+      description: "Assistante vocale accessible pour le quotidien",
       publisher: { "@id": `${SITE_URL}/#organization` },
       inLanguage: "fr",
       potentialAction: {
