@@ -9,9 +9,8 @@
  *  1. Vérification du secret Vercel Cron (ou CRON_SECRET en dev)
  *  2. Calcul de la semaine ISO → sélection du topic
  *  3. Génération du contenu via Vercel AI SDK
- *  4. Publication dans Sanity (TODO GROA-122 — stubs pour l'instant)
+ *  4. Publication dans Sanity (projet voixcourses-blog, GROA-122 done)
  *
- * TODO GROA-122 : activer publishPost() une fois Sanity configuré
  * TODO GROA-125 : wrapper avec Sentry.withMonitor une fois @sentry/nextjs installé
  */
 
@@ -112,45 +111,35 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   // -- Publication Sanity -----------------------------------------------------
-  // TODO GROA-122 : décommenter une fois SANITY_PROJECT_ID + SANITY_API_TOKEN disponibles
-  // const postId = await publishPost({
-  //   title: topic.title,
-  //   slug: { current: topic.slug },
-  //   publishedAt: new Date().toISOString(),
-  //   excerpt,
-  //   body: textToPortableText(generatedText),
-  //   topicId: topic.id,
-  //   topicSlug: topic.slug,
-  //   category: topic.category,
-  //   readingTimeMinutes: estimateReadingTime(generatedText),
-  //   organizationId: "coraly",
-  // });
+  const readingTimeMinutes = estimateReadingTime(generatedText);
+  let postId: string;
+  try {
+    postId = await publishPost({
+      title: topic.title,
+      slug: { current: topic.slug },
+      publishedAt: new Date().toISOString(),
+      excerpt,
+      body: textToPortableText(generatedText),
+      topicId: topic.id,
+      topicSlug: topic.slug,
+      category: topic.category,
+      readingTimeMinutes,
+    });
+  } catch (err) {
+    console.error("[cron/generate-blog] Échec publication Sanity:", err);
+    return NextResponse.json(
+      { error: "Publication Sanity échouée", detail: String(err) },
+      { status: 500 }
+    );
+  }
 
-  // Stub temporaire — log de ce qui serait publié
-  const draftPost = {
-    title: topic.title,
-    slug: topic.slug,
-    publishedAt: new Date().toISOString(),
-    excerpt,
-    bodyPreview: generatedText.substring(0, 300) + "…",
-    readingTimeMinutes: estimateReadingTime(generatedText),
-    isoWeek,
-    organizationId: "coraly",
-    status: "DRY_RUN — Sanity non configuré (attendre GROA-122)",
-  };
-
-  // Référencer publishPost pour éviter l'erreur TS "unused import"
-  void publishPost;
-  void textToPortableText;
-
-  console.info("[cron/generate-blog] Dry run — article qui serait publié:", JSON.stringify(draftPost, null, 2));
+  console.info(`[cron/generate-blog] Article publié dans Sanity — id: ${postId}, slug: ${topic.slug}`);
 
   return NextResponse.json({
     ok: true,
-    dryRun: true,
+    sanityId: postId,
     isoWeek,
     topic: { id: topic.id, title: topic.title, slug: topic.slug },
-    readingTimeMinutes: estimateReadingTime(generatedText),
-    message: "Dry run OK — activer publishPost() après GROA-122",
+    readingTimeMinutes,
   });
 }
