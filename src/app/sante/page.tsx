@@ -12,7 +12,7 @@
  * - WCAG AAA, police Luciole, design system marine
  *
  * Limite V1 : produits sur ordonnance non disponibles (scraping public uniquement).
- * GROA-245 — Phase 4b VoixSanté
+ * GROA-246 — Phase 4b VoixSanté interface conversationnelle Koraly
  */
 
 import {
@@ -319,7 +319,7 @@ export default function SantePage() {
 
       try {
         const res = await fetch(
-          `/api/pharma/search?q=${encodeURIComponent(q)}`
+          `/api/sante/search?q=${encodeURIComponent(q)}`
         );
 
         if (!res.ok) {
