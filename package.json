@@ -15,13 +15,16 @@
   },
   "dependencies": {
     "@elevenlabs/client": "^1.2.0",
-    "@vercel/analytics": "^1.5.0",
-    "@vercel/speed-insights": "^1.2.0",
     "@elevenlabs/react": "^1.1.0",
+    "@neondatabase/serverless": "^1.0.2",
     "@portabletext/react": "^6.0.3",
+    "@prisma/adapter-neon": "^7.7.0",
+    "@prisma/client": "^7.7.0",
     "@sanity/client": "^7.21.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
+    "@vercel/analytics": "^1.5.0",
+    "@vercel/speed-insights": "^1.2.0",
     "ai": "^6.0.158",
     "next": "16.2.3",
     "react": "19.2.4",
@@ -43,9 +46,21 @@
     "husky": "^9.1.7",
     "jsdom": "^29.0.2",
     "lint-staged": "^16.4.0",
+    "prisma": "^7.7.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.4"
+  },
+  "prisma": {
+    "seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "prisma",
+      "sharp",
+      "unrs-resolver"
+    ]
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

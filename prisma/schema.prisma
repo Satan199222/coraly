@@ -1,0 +1,55 @@
+// Schéma Prisma — VoixCourses (mono-app)
+// DB : Neon PostgreSQL (branching par environnement)
+// URL configurée dans prisma.config.ts via DATABASE_URL
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── VoixTV ──────────────────────────────────────────────────────────────────
+
+/// Chaîne TNT identifiée par son numéro logique et son ID SFR EPG
+model TvChannel {
+  id        String  @id @default(cuid())
+  /// Identifiant de la chaîne dans l'API SFR EPG (ex. 192 pour TF1)
+  sfrEpgId  Int     @unique @map("sfr_epg_id")
+  /// Nom affiché (ex. "TF1", "France 2")
+  name      String
+  /// Numéro TNT logique (1–18)
+  tntNumber Int     @unique @map("tnt_number")
+  /// URL du logo de la chaîne (fourni par SFR EPG ou hébergé en Blob)
+  logoUrl   String? @map("logo_url")
+  /// Indique si la chaîne est active dans l'interface
+  active    Boolean @default(true)
+
+  programs TvProgram[]
+
+  @@map("tv_channels")
+}
+
+/// Programme EPG récupéré depuis l'API SFR et mis en cache
+model TvProgram {
+  id        String   @id @default(cuid())
+  channel   TvChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  channelId String   @map("channel_id")
+  title     String
+  subtitle  String?
+  genre     String?
+  synopsis  String?
+  startAt   DateTime @map("start_at")
+  endAt     DateTime @map("end_at")
+  imageUrl  String?  @map("image_url")
+  season    Int?
+  episode   Int?
+  /// Horodatage de la dernière récupération depuis SFR EPG
+  fetchedAt DateTime @map("fetched_at")
+
+  @@index([channelId, startAt])
+  @@index([startAt, endAt])
+  @@map("tv_programs")
+}
