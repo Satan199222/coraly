@@ -44,9 +44,9 @@ export function useShellContext(): ShellContextValue {
 interface ConversationShellProps {
   config: ConversationShellConfig;
   dynamicVariables: Record<string, string>;
-  contextualUpdateText?: string;
   /** Endpoint serveur qui retourne { signedUrl }. Défaut : /api/agent/signed-url */
   signedUrlEndpoint?: string;
+  contextualUpdateText?: string;
   renderContext?: () => ReactNode;
   renderSidePanel?: () => ReactNode;
   children?: ReactNode;
@@ -55,8 +55,8 @@ interface ConversationShellProps {
 export function ConversationShell({
   config,
   dynamicVariables,
-  contextualUpdateText,
   signedUrlEndpoint = "/api/agent/signed-url",
+  contextualUpdateText,
   renderContext,
   renderSidePanel,
   children,
@@ -83,8 +83,8 @@ export function ConversationShell({
           <ConversationInner
             config={config}
             dynamicVariables={dynamicVariables}
-            contextualUpdateText={contextualUpdateText}
             signedUrlEndpoint={signedUrlEndpoint}
+            contextualUpdateText={contextualUpdateText}
             announce={announce}
             setAnnounce={setAnnounce}
             error={error}
@@ -105,8 +105,8 @@ export function ConversationShell({
 interface InnerProps {
   config: ConversationShellConfig;
   dynamicVariables: Record<string, string>;
-  contextualUpdateText?: string;
   signedUrlEndpoint: string;
+  contextualUpdateText?: string;
   announce: string;
   setAnnounce: (msg: string) => void;
   error: string | null;
@@ -119,8 +119,8 @@ interface InnerProps {
 function ConversationInner({
   config,
   dynamicVariables,
-  contextualUpdateText,
   signedUrlEndpoint,
+  contextualUpdateText,
   setAnnounce,
   error,
   setError,
