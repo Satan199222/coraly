@@ -45,6 +45,8 @@ interface ConversationShellProps {
   config: ConversationShellConfig;
   dynamicVariables: Record<string, string>;
   contextualUpdateText?: string;
+  /** Endpoint serveur qui retourne { signedUrl }. Défaut : /api/agent/signed-url */
+  signedUrlEndpoint?: string;
   renderContext?: () => ReactNode;
   renderSidePanel?: () => ReactNode;
   children?: ReactNode;
@@ -54,6 +56,7 @@ export function ConversationShell({
   config,
   dynamicVariables,
   contextualUpdateText,
+  signedUrlEndpoint = "/api/agent/signed-url",
   renderContext,
   renderSidePanel,
   children,
@@ -81,6 +84,7 @@ export function ConversationShell({
             config={config}
             dynamicVariables={dynamicVariables}
             contextualUpdateText={contextualUpdateText}
+            signedUrlEndpoint={signedUrlEndpoint}
             announce={announce}
             setAnnounce={setAnnounce}
             error={error}
@@ -102,6 +106,7 @@ interface InnerProps {
   config: ConversationShellConfig;
   dynamicVariables: Record<string, string>;
   contextualUpdateText?: string;
+  signedUrlEndpoint: string;
   announce: string;
   setAnnounce: (msg: string) => void;
   error: string | null;
@@ -115,6 +120,7 @@ function ConversationInner({
   config,
   dynamicVariables,
   contextualUpdateText,
+  signedUrlEndpoint,
   setAnnounce,
   error,
   setError,
@@ -147,7 +153,7 @@ function ConversationInner({
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      const urlRes = await fetch("/api/agent/signed-url");
+      const urlRes = await fetch(signedUrlEndpoint);
       if (!urlRes.ok) {
         const body = await urlRes.json().catch(() => ({}));
         throw new Error(
