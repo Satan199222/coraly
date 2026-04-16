@@ -38,7 +38,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["playwright-core"],
+  serverExternalPackages: ["playwright-core", "sharp"],
   turbopack: {
     root: __dirname,
   },
