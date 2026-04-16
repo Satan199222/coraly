@@ -1,8 +1,10 @@
 name: CI
 
 on:
+  push:
+    branches: [main, master, develop, staging]
   pull_request:
-    branches: [main]
+    branches: [main, master, develop]
   workflow_dispatch:
     inputs:
       run_e2e:
