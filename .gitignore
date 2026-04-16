@@ -4,6 +4,7 @@ probes/results/
 probes/scratch/
 .env
 .env.local
+.env.vercel.*
 .next/
 .vercel/
 
