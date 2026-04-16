@@ -1,30 +1,34 @@
 import { describe, it, expect } from "vitest";
-import { getTopicForWeek, getISOWeek, BLOG_TOPICS } from "./blog-topics";
+import { BLOG_THEMES, BlogCategory, getISOWeek } from "./blog-topics";
 
-describe("getTopicForWeek", () => {
-  it("retourne un topic valide pour une semaine normale", () => {
-    const topic = getTopicForWeek(1);
-    expect(topic).toBeDefined();
-    expect(topic?.id).toBe(1);
+const EXPECTED_CATEGORIES: BlogCategory[] = [
+  "accessibilite",
+  "technologie",
+  "formation",
+  "pratique",
+];
+
+describe("BLOG_THEMES", () => {
+  it("contient exactement les 4 catégories attendues", () => {
+    const keys = Object.keys(BLOG_THEMES) as BlogCategory[];
+    expect(keys.sort()).toEqual([...EXPECTED_CATEGORIES].sort());
   });
 
-  it("effectue une rotation circulaire sur le tableau", () => {
-    const topic1 = getTopicForWeek(1);
-    const topicWrapped = getTopicForWeek(1 + BLOG_TOPICS.length);
-    expect(topicWrapped).toEqual(topic1);
+  it("chaque thème a les champs obligatoires non vides", () => {
+    for (const cat of EXPECTED_CATEGORIES) {
+      const theme = BLOG_THEMES[cat];
+      expect(theme.description, `${cat}.description`).toBeTruthy();
+      expect(theme.mainKeywords.length, `${cat}.mainKeywords`).toBeGreaterThan(0);
+      expect(theme.exampleTopics.length, `${cat}.exampleTopics`).toBeGreaterThan(0);
+    }
   });
 
-  it("retourne undefined sur tableau vide (pas de crash silencieux)", () => {
-    // Simule le cas où le tableau serait vide
-    const result = getTopicForWeekFromPool(1, []);
-    expect(result).toBeUndefined();
-  });
-
-  it("couvre toutes les semaines ISO (1–53) sans NaN ni undefined", () => {
-    for (let week = 1; week <= 53; week++) {
-      const topic = getTopicForWeek(week);
-      expect(topic).toBeDefined();
-      expect(typeof topic?.id).toBe("number");
+  it("les mainKeywords sont tous des chaînes non vides", () => {
+    for (const cat of EXPECTED_CATEGORIES) {
+      for (const kw of BLOG_THEMES[cat].mainKeywords) {
+        expect(typeof kw).toBe("string");
+        expect(kw.trim().length).toBeGreaterThan(0);
+      }
     }
   });
 });
@@ -42,17 +46,9 @@ describe("getISOWeek", () => {
     const week = getISOWeek(new Date("2021-01-04"));
     expect(week).toBe(1);
   });
-});
 
-/**
- * Helper de test : permet de tester getTopicForWeek avec un pool arbitraire
- * sans modifier l'export réel. Reproduit la même logique que getTopicForWeek.
- */
-function getTopicForWeekFromPool<T>(
-  isoWeek: number,
-  pool: T[]
-): T | undefined {
-  if (pool.length === 0) return undefined;
-  const index = (isoWeek - 1) % pool.length;
-  return pool[index];
-}
+  it("retourne la semaine 53 pour le 31 décembre 2020", () => {
+    const week = getISOWeek(new Date("2020-12-31"));
+    expect(week).toBe(53);
+  });
+});
