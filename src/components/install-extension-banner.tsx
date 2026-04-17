@@ -6,6 +6,7 @@ import {
   detectBrowser,
   type BrowserInfo,
 } from "@/lib/extension/browser-detection";
+import { IconButton } from "@/components/ui/IconButton";
 
 const DISMISS_KEY = "coraly-install-banner-dismissed-at";
 /** Le banner réapparaît après ce délai (sinon jamais) — on ne veut pas
@@ -66,14 +67,13 @@ export function InstallExtensionBanner() {
             {browser.unsupportedReason}
           </p>
         </div>
-        <button
-          type="button"
+        <IconButton
+          label="Fermer cette information"
           onClick={handleDismiss}
-          aria-label="Fermer cette information"
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] shrink-0 text-sm"
+          className="shrink-0"
         >
           ✕
-        </button>
+        </IconButton>
       </aside>
     );
   }
@@ -114,14 +114,13 @@ export function InstallExtensionBanner() {
           )}
         </div>
       </div>
-      <button
-        type="button"
+      <IconButton
+        label="Masquer cette suggestion (réapparaîtra dans 7 jours)"
         onClick={handleDismiss}
-        aria-label="Masquer cette suggestion (réapparaîtra dans 7 jours)"
-        className="self-end sm:self-start min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] shrink-0"
+        className="self-end sm:self-start shrink-0"
       >
         ✕
-      </button>
+      </IconButton>
     </aside>
   );
 }
