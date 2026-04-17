@@ -730,7 +730,7 @@ export default function RecettesPage() {
 
   return (
     <>
-      <AccessibilityBar />
+      <AccessibilityBar service="recettes" />
       <LiveRegion message={announcement} />
       <SiteHeader />
       <main id="main" tabIndex={-1}>

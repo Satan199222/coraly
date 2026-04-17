@@ -46,6 +46,8 @@ interface ConversationShellProps {
   dynamicVariables: Record<string, string>;
   /** Endpoint serveur qui retourne { signedUrl }. Défaut : /api/agent/signed-url */
   signedUrlEndpoint?: string;
+  /** Service courant — transmis à AccessibilityBar pour masquer les réglages non pertinents. */
+  service?: "courses" | "tv" | "transport" | "poste" | "sante" | "recettes";
   contextualUpdateText?: string;
   renderContext?: () => ReactNode;
   renderSidePanel?: () => ReactNode;
@@ -56,6 +58,7 @@ export function ConversationShell({
   config,
   dynamicVariables,
   signedUrlEndpoint = "/api/agent/signed-url",
+  service,
   contextualUpdateText,
   renderContext,
   renderSidePanel,
@@ -67,7 +70,7 @@ export function ConversationShell({
 
   return (
     <>
-      <AccessibilityBar />
+      <AccessibilityBar service={service} />
       <SiteHeader compact />
       <LiveRegion message={announce} />
       {error && <LiveRegion message={error} urgency="assertive" />}

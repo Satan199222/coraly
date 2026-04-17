@@ -413,7 +413,7 @@ export default function SantePage() {
 
   return (
     <>
-      <AccessibilityBar />
+      <AccessibilityBar service="sante" />
       <LiveRegion message={announcement} />
       <SiteHeader />
       <main id="main" tabIndex={-1}>

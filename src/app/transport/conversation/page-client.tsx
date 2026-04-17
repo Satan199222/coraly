@@ -488,6 +488,7 @@ export default function TransportConversationPageClient() {
 
   return (
     <ConversationShell
+      service="transport"
       config={{
         title: "Koraly Transport — Transports en commun IdF",
         description:

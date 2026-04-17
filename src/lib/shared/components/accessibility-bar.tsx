@@ -9,10 +9,17 @@ import {
   type SpeechRate,
 } from "@/lib/preferences/use-preferences";
 
+type CoralyService = "courses" | "tv" | "transport" | "poste" | "sante" | "recettes";
+
+/** Services pour lesquels le régime alimentaire et les allergènes sont pertinents. */
+const FOOD_SERVICES: ReadonlySet<CoralyService> = new Set(["courses", "recettes"]);
+
 interface AccessibilityBarProps {
   onVoiceToggle?: (enabled: boolean) => void;
   /** Ouvre le dialog d'aide — normalement déclenché aussi par `?`. */
   onHelpRequest?: () => void;
+  /** Service courant — masque les réglages non pertinents (ex. régime alimentaire sur /tv). */
+  service?: CoralyService;
 }
 
 type Theme = "clair" | "sombre" | "jaune-noir" | "blanc-bleu";
@@ -76,7 +83,10 @@ function safeLocalSet(key: string, value: string): void {
 export function AccessibilityBar({
   onVoiceToggle,
   onHelpRequest,
+  service,
 }: AccessibilityBarProps = {}) {
+  const showFoodPrefs = !service || FOOD_SERVICES.has(service);
+  const showExtension = !service || service === "courses";
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === "undefined") return "clair";
     const saved = safeLocalGet("coraly-theme");
@@ -231,7 +241,7 @@ export function AccessibilityBar({
           🔊 Voix {voiceEnabled ? "active" : "coupée"}
         </button>
 
-        {extension.installed && (
+        {showExtension && extension.installed && (
           <span
             className="shrink-0 px-3 rounded-lg text-sm font-bold"
             style={{ height: 52, display: "inline-flex", alignItems: "center", background: "var(--brass)", color: "var(--accent-ink)" }}
@@ -285,14 +295,15 @@ export function AccessibilityBar({
           className="grid gap-4 mt-3 md:grid-cols-2 text-sm"
           style={{ color: "var(--text-on-ink)" }}
         >
-          {/* Régime alimentaire */}
+          {/* Régime alimentaire — pertinent pour Courses + Recettes uniquement */}
+          {showFoodPrefs && (
           <fieldset
             className="rounded p-3"
             style={{ border: "1px solid var(--text-on-ink-faint)" }}
           >
             <legend className="px-2 font-semibold">Régime alimentaire</legend>
             <p className="text-xs mb-2" style={{ color: "var(--text-on-ink-muted)" }}>
-              Appliqué à toutes vos recherches.
+              Appliqué à vos recherches Courses et Recettes.
             </p>
             <div className="flex flex-wrap gap-2">
               {DIET_OPTIONS.map((opt) => {
@@ -318,6 +329,7 @@ export function AccessibilityBar({
               })}
             </div>
           </fieldset>
+          )}
 
           {/* Synthèse vocale */}
           <fieldset
@@ -387,7 +399,8 @@ export function AccessibilityBar({
             </p>
           </fieldset>
 
-          {/* Allergènes */}
+          {/* Allergènes — pertinent pour Courses + Recettes uniquement */}
+          {showFoodPrefs && (
           <fieldset
             className="rounded p-3 md:col-span-2"
             style={{ border: "1px solid var(--text-on-ink-faint)" }}
@@ -415,6 +428,7 @@ export function AccessibilityBar({
               aria-label="Liste des allergènes à éviter, séparés par des virgules"
             />
           </fieldset>
+          )}
         </div>
       </div>
       )}

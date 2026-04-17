@@ -405,6 +405,7 @@ export default function RecettesConversationPageClient() {
 
   return (
     <ConversationShell
+      service="recettes"
       config={{
         title: "Koraly Recettes — Cuisiner par la voix",
         description:

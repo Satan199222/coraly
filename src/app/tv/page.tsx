@@ -454,6 +454,7 @@ export default function TvPage() {
       <LiveRegion message={announcement} />
 
       <AccessibilityBar
+        service="tv"
         onVoiceToggle={setVoiceEnabled}
         onHelpRequest={() => setHelpOpen(true)}
       />

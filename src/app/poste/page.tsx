@@ -846,6 +846,7 @@ export default function PostePage() {
   return (
     <>
       <AccessibilityBar
+        service="poste"
         onVoiceToggle={setVoiceEnabled}
         onHelpRequest={() => setHelpOpen(true)}
       />

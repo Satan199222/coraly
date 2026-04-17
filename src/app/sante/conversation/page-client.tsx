@@ -438,6 +438,7 @@ export default function SanteConversationPageClient() {
 
   return (
     <ConversationShell
+      service="sante"
       config={{
         title: "Koraly Santé — Médicaments & Santé",
         description:

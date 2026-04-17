@@ -321,6 +321,7 @@ export default function TvConversationPageClient() {
 
   return (
     <ConversationShell
+      service="tv"
       config={{
         title: "Koraly TV — Programmes du soir",
         description:

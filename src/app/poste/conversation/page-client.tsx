@@ -427,6 +427,7 @@ export default function PosteConversationPageClient() {
 
   return (
     <ConversationShell
+      service="poste"
       config={{
         title: "Koraly Poste — Services La Poste",
         description:

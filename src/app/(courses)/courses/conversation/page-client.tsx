@@ -62,6 +62,7 @@ export default function ConversationPageClient() {
 
   return (
     <ConversationShell
+      service="courses"
       config={{
         title: "Mode conversation",
         description:

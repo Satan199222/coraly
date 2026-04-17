@@ -595,6 +595,7 @@ export default function TransportPage() {
   return (
     <>
       <AccessibilityBar
+        service="transport"
         onVoiceToggle={setVoiceEnabled}
         onHelpRequest={() => setHelpOpen(true)}
       />

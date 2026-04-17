@@ -131,6 +131,7 @@ export default function HomePage() {
     <>
       <LiveRegion message={announcement} />
       <AccessibilityBar
+        service="courses"
         onVoiceToggle={setVoiceEnabled}
         onHelpRequest={() => setHelpOpen(true)}
       />

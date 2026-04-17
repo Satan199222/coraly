@@ -764,6 +764,7 @@ function Home() {
   return (
     <>
       <AccessibilityBar
+        service="courses"
         onVoiceToggle={setVoiceEnabled}
         onHelpRequest={() => setHelpOpen(true)}
       />
