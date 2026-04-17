@@ -213,7 +213,7 @@ export default function RootLayout({
 
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-[var(--accent)] focus:text-[var(--bg)] focus:px-4 focus:py-2 focus:rounded"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-[var(--accent)] focus:text-[var(--bg)] focus:px-4 focus:py-2 focus:rounded focus:outline-3 focus:outline-[var(--focus-ring)] focus:outline-offset-3"
         >
           Aller au contenu principal
         </a>
