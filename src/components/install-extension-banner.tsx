@@ -70,7 +70,7 @@ export function InstallExtensionBanner() {
           type="button"
           onClick={handleDismiss}
           aria-label="Fermer cette information"
-          className="text-[var(--text-muted)] hover:text-[var(--text)] shrink-0 text-sm"
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] shrink-0 text-sm"
         >
           ✕
         </button>
@@ -118,7 +118,7 @@ export function InstallExtensionBanner() {
         type="button"
         onClick={handleDismiss}
         aria-label="Masquer cette suggestion (réapparaîtra dans 7 jours)"
-        className="self-end sm:self-start text-[var(--text-muted)] hover:text-[var(--text)] shrink-0 text-sm px-2"
+        className="self-end sm:self-start min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] shrink-0 text-sm"
       >
         ✕
       </button>
