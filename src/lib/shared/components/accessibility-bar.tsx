@@ -4,21 +4,17 @@ import { useEffect, useState } from "react";
 import { useExtension } from "@/lib/extension/use-extension";
 import {
   usePreferences,
-  type DietaryRestriction,
   type SpeechLocale,
   type SpeechRate,
 } from "@/lib/preferences/use-preferences";
 
 type CoralyService = "courses" | "tv" | "transport" | "poste" | "sante" | "recettes";
 
-/** Services pour lesquels le régime alimentaire et les allergènes sont pertinents. */
-const FOOD_SERVICES: ReadonlySet<CoralyService> = new Set(["courses", "recettes"]);
-
 interface AccessibilityBarProps {
   onVoiceToggle?: (enabled: boolean) => void;
   /** Ouvre le dialog d'aide — normalement déclenché aussi par `?`. */
   onHelpRequest?: () => void;
-  /** Service courant — masque les réglages non pertinents (ex. régime alimentaire sur /tv). */
+  /** Service courant — contrôle la visibilité du badge extension (courses only). */
   service?: CoralyService;
 }
 
@@ -32,15 +28,6 @@ const THEME_OPTIONS: { value: Theme; label: string; aria: string }[] = [
 ];
 
 const FONT_SIZES = ["16px", "18px", "22px", "28px"] as const;
-
-const DIET_OPTIONS: { value: DietaryRestriction; label: string }[] = [
-  { value: "sans-gluten", label: "Sans gluten" },
-  { value: "sans-lactose", label: "Sans lactose" },
-  { value: "vegan", label: "Végan" },
-  { value: "vegetarien", label: "Végétarien" },
-  { value: "halal", label: "Halal" },
-  { value: "casher", label: "Casher" },
-];
 
 const RATE_OPTIONS: { value: SpeechRate; label: string }[] = [
   { value: "slow", label: "Lent" },
@@ -85,7 +72,6 @@ export function AccessibilityBar({
   onHelpRequest,
   service,
 }: AccessibilityBarProps = {}) {
-  const showFoodPrefs = !service || FOOD_SERVICES.has(service);
   const showExtension = !service || service === "courses";
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === "undefined") return "clair";
@@ -124,13 +110,6 @@ export function AccessibilityBar({
     document.documentElement.style.setProperty("--font-size-base", fontSize);
     safeLocalSet("coraly-font-size", fontSize);
   }, [fontSize]);
-
-  function toggleDiet(d: DietaryRestriction) {
-    const next = prefs.diet.includes(d)
-      ? prefs.diet.filter((x) => x !== d)
-      : [...prefs.diet, d];
-    update({ diet: next });
-  }
 
   const currentSizeIdx = FONT_SIZES.indexOf(fontSize as (typeof FONT_SIZES)[number]);
   const decreaseDisabled = currentSizeIdx <= 0;
@@ -292,45 +271,9 @@ export function AccessibilityBar({
       <div id="a11y-advanced-panel" className="px-6 pb-4 pt-1">
 
         <div
-          className="grid gap-4 mt-3 md:grid-cols-2 text-sm"
+          className="grid gap-4 mt-3 text-sm max-w-md"
           style={{ color: "var(--text-on-ink)" }}
         >
-          {/* Régime alimentaire — pertinent pour Courses + Recettes uniquement */}
-          {showFoodPrefs && (
-          <fieldset
-            className="rounded p-3"
-            style={{ border: "1px solid var(--text-on-ink-faint)" }}
-          >
-            <legend className="px-2 font-semibold">Régime alimentaire</legend>
-            <p className="text-xs mb-2" style={{ color: "var(--text-on-ink-muted)" }}>
-              Appliqué à vos recherches Courses et Recettes.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {DIET_OPTIONS.map((opt) => {
-                const active = prefs.diet.includes(opt.value);
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => toggleDiet(opt.value)}
-                    aria-pressed={active}
-                    aria-label={`Régime ${opt.label}${active ? ", activé" : ", désactivé"}`}
-                    className="px-3 py-1 rounded border text-sm"
-                    style={{
-                      borderColor: active ? "var(--brass)" : "var(--text-on-ink-faint)",
-                      background: active ? "var(--brass)" : "transparent",
-                      color: active ? "var(--accent-ink)" : "var(--text-on-ink)",
-                      fontWeight: active ? 700 : 500,
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
-          )}
-
           {/* Synthèse vocale */}
           <fieldset
             className="rounded p-3"
@@ -399,36 +342,6 @@ export function AccessibilityBar({
             </p>
           </fieldset>
 
-          {/* Allergènes — pertinent pour Courses + Recettes uniquement */}
-          {showFoodPrefs && (
-          <fieldset
-            className="rounded p-3 md:col-span-2"
-            style={{ border: "1px solid var(--text-on-ink-faint)" }}
-          >
-            <legend className="px-2 font-semibold">Allergènes à éviter</legend>
-            <p className="text-xs mb-2" style={{ color: "var(--text-on-ink-muted)" }}>
-              Séparés par des virgules — ex : arachide, fruits à coque, moutarde.
-            </p>
-            <input
-              type="text"
-              defaultValue={prefs.allergens.join(", ")}
-              onBlur={(e) => {
-                const list = e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean);
-                update({ allergens: list });
-              }}
-              className="w-full px-3 py-2 rounded text-sm"
-              style={{
-                background: "var(--text-on-ink-faint)",
-                color: "var(--text-on-ink)",
-                border: "1px solid var(--text-on-ink-faint)",
-              }}
-              aria-label="Liste des allergènes à éviter, séparés par des virgules"
-            />
-          </fieldset>
-          )}
         </div>
       </div>
       )}
