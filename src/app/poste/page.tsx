@@ -22,13 +22,10 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import { AccessibilityBar } from "@/lib/shared/components/accessibility-bar";
-import { LiveRegion } from "@/lib/shared/components/live-region";
 import { KoralyOrb } from "@/lib/shared/components/koraly-orb";
 import type { KoralyOrbStatus } from "@/lib/shared/components/koraly-orb";
-import { SiteHeader } from "@/components/site-header";
-import { Footer } from "@/components/footer";
-import { HelpDialog } from "@/components/help-dialog";
+import { KoralyPageShell } from "@/lib/shared/components/koraly-page-shell";
+import { KoralyMsgBubble } from "@/lib/shared/components/koraly-msg-bubble";
 import { useSpeech } from "@/lib/shared/speech/use-speech";
 import { usePreferences, SPEECH_RATE_VALUE } from "@/lib/preferences/use-preferences";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -120,38 +117,7 @@ function trackingStatusToText(result: TrackingResult): string {
   return base + eventTxt + deliveryTxt;
 }
 
-// ---------------------------------------------------------------------------
-// Composant message
-// ---------------------------------------------------------------------------
-
-interface MsgBubbleProps {
-  msg: ChatMsg;
-}
-
-function MsgBubble({ msg }: MsgBubbleProps) {
-  const isKoraly = msg.role === "koraly";
-  return (
-    <div className={`flex ${isKoraly ? "justify-start" : "justify-end"}`}>
-      <div
-        className="max-w-prose rounded-2xl px-4 py-3 text-base leading-relaxed"
-        style={{
-          background: isKoraly ? "var(--bg-card)" : "var(--accent)",
-          color: isKoraly ? "var(--text)" : "#fff",
-          border: isKoraly ? "1px solid var(--border)" : "none",
-          borderRadius: isKoraly ? "4px 18px 18px 18px" : "18px 4px 18px 18px",
-        }}
-      >
-        {msg.loading ? (
-          <span aria-label="Koraly réfléchit…" style={{ opacity: 0.6 }}>
-            …
-          </span>
-        ) : (
-          msg.text
-        )}
-      </div>
-    </div>
-  );
-}
+// MsgBubble → utilise KoralyMsgBubble (GROA-496)
 
 // ---------------------------------------------------------------------------
 // Boutons d'action rapide
@@ -844,23 +810,15 @@ export default function PostePage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <>
-      <AccessibilityBar
-        service="poste"
-        onVoiceToggle={setVoiceEnabled}
-        onHelpRequest={() => setHelpOpen(true)}
-      />
-
-      <LiveRegion message={announcement} />
-
-      <SiteHeader />
-
-      <main
-        id="main"
-        tabIndex={-1}
-        className="flex flex-col min-h-screen px-4 py-8 max-w-2xl mx-auto"
-        style={{ outline: "none" }}
-      >
+    <KoralyPageShell
+      service="poste"
+      announcement={announcement}
+      onVoiceToggle={setVoiceEnabled}
+      helpOpen={helpOpen}
+      onHelpClose={() => setHelpOpen(false)}
+      onHelpOpen={() => setHelpOpen(true)}
+      mainClassName="flex flex-col min-h-screen px-4 py-8 max-w-2xl mx-auto"
+    >
         <h1 className="vc-h1 mb-1">VoixPoste</h1>
         <p className="mb-4 text-sm" style={{ color: "var(--text-soft)" }}>
           La Poste par la voix — suivi de colis, courrier, recommandé électronique.
@@ -961,7 +919,13 @@ export default function PostePage() {
           style={{ maxHeight: "40vh", minHeight: "200px", paddingBottom: "0.5rem" }}
         >
           {messages.map((msg) => (
-            <MsgBubble key={msg.id} msg={msg} />
+            <KoralyMsgBubble
+              key={msg.id}
+              role={msg.role}
+              text={msg.text}
+              loading={msg.loading}
+              loadingLabel="Koraly réfléchit…"
+            />
           ))}
           <div ref={chatEndRef} aria-hidden="true" />
         </section>
@@ -1058,11 +1022,6 @@ export default function PostePage() {
           <kbd>V</kbd> micro ·{" "}
           <kbd>Échap</kbd> accueil
         </p>
-      </main>
-
-      <Footer />
-
-      <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
-    </>
+    </KoralyPageShell>
   );
 }

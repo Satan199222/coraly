@@ -14,11 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityBar } from "@/lib/shared/components/accessibility-bar";
-import { LiveRegion } from "@/lib/shared/components/live-region";
-import { SiteHeader } from "@/components/site-header";
-import { Footer } from "@/components/footer";
-import { HelpDialog } from "@/components/help-dialog";
+import { KoralyPageShell } from "@/lib/shared/components/koraly-page-shell";
 import { useSpeech } from "@/lib/shared/speech/use-speech";
 import { usePreferences, SPEECH_RATE_VALUE } from "@/lib/preferences/use-preferences";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -450,23 +446,15 @@ export default function TvPage() {
     6;
 
   return (
-    <>
-      <LiveRegion message={announcement} />
-
-      <AccessibilityBar
-        service="tv"
-        onVoiceToggle={setVoiceEnabled}
-        onHelpRequest={() => setHelpOpen(true)}
-      />
-
-      <SiteHeader />
-
-      <main
-        id="main"
-        tabIndex={-1}
-        className="min-h-screen px-4 py-10 max-w-5xl mx-auto"
-        style={{ outline: "none" }}
-      >
+    <KoralyPageShell
+      service="tv"
+      announcement={announcement}
+      onVoiceToggle={setVoiceEnabled}
+      helpOpen={helpOpen}
+      onHelpClose={() => setHelpOpen(false)}
+      onHelpOpen={() => setHelpOpen(true)}
+      mainClassName="min-h-screen px-4 py-10 max-w-5xl mx-auto"
+    >
         <h1 className="vc-h1 mb-1">VoixTV</h1>
         <p className="mb-6 text-base" style={{ color: "var(--text-soft)" }}>
           Les programmes du soir à la télé, lus par Koraly.
@@ -632,14 +620,6 @@ export default function TvPage() {
             )}
           </section>
         )}
-      </main>
-
-      <Footer />
-
-      <HelpDialog
-        open={helpOpen}
-        onClose={() => setHelpOpen(false)}
-      />
-    </>
+    </KoralyPageShell>
   );
 }
