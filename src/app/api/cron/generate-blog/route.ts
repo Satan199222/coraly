@@ -22,7 +22,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAllPosts, getWriteClientForCron, publishPost } from "@/lib/sanity/client";
-import { BLOG_THEMES, BlogCategory, BlogTopic, getISOWeek } from "@/lib/blog-topics";
+import { BLOG_THEMES, BlogCategory, BlogTopic, getISOWeek, getISOYear } from "@/lib/blog-topics";
 
 // ---------------------------------------------------------------------------
 // Auth — strict, aucune tolérance si CRON_SECRET non configuré
@@ -538,8 +538,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const isoWeek = getISOWeek();
-  console.info(`[cron/generate-blog] Démarrage — semaine ISO ${isoWeek}`);
+  const now = new Date();
+  const isoWeek = getISOWeek(now);
+  const isoYear = getISOYear(now);
+  console.info(`[cron/generate-blog] Démarrage — semaine ISO ${isoYear}-W${isoWeek}`);
 
   // -- 1. Fetch articles existants ------------------------------------------
   let existingArticles: ExistingArticle[] = [];
@@ -617,19 +619,25 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // -- 6. Publication dans Sanity --------------------------------------------
   const readingTimeMinutes = estimateReadingTime(articleBody.markdownContent);
+  // _id déterministe : permet createOrReplace() idempotent — re-run de la même
+  // semaine ISO écrase l'article existant plutôt que d'en créer un doublon.
+  const sanityDocId = `coraly-${topic.slug}-${isoYear}-w${isoWeek}`;
   let postId: string;
   try {
-    postId = await publishPost({
-      title: topic.title,
-      slug: { current: topic.slug },
-      publishedAt: new Date().toISOString(),
-      excerpt: articleBody.description,
-      body: portableBody,
-      topicSlug: topic.slug,
-      category: topic.category as "accessibilite" | "formation" | "technologie" | "pratique",
-      readingTimeMinutes,
-      ...(mainImageRef ? { mainImage: mainImageRef } : {}),
-    });
+    postId = await publishPost(
+      {
+        title: topic.title,
+        slug: { current: topic.slug },
+        publishedAt: new Date().toISOString(),
+        excerpt: articleBody.description,
+        body: portableBody,
+        topicSlug: topic.slug,
+        category: topic.category as "accessibilite" | "formation" | "technologie" | "pratique",
+        readingTimeMinutes,
+        ...(mainImageRef ? { mainImage: mainImageRef } : {}),
+      },
+      sanityDocId
+    );
   } catch (err) {
     console.error("[cron/generate-blog] Échec publication Sanity:", err);
     return NextResponse.json(
@@ -639,7 +647,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   console.info(
-    `[cron/generate-blog] Article publié — sanityId: ${postId}, slug: ${topic.slug}, image: ${mainImageRef ? "oui" : "non"}`
+    `[cron/generate-blog] Article publié — sanityId: ${postId}, docId: ${sanityDocId}, slug: ${topic.slug}, image: ${mainImageRef ? "oui" : "non"}`
   );
 
   return NextResponse.json({
