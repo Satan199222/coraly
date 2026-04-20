@@ -2,6 +2,14 @@
 
 @source "../**/*.{ts,tsx}";
 
+@theme {
+  --color-accent: var(--accent);
+  --color-bg: var(--bg);
+  --color-danger: var(--danger);
+  --color-focus-ring: var(--focus-ring);
+  --color-border: var(--border);
+}
+
 /* =============================================================
    CORALY — DESIGN SYSTEM "MARINE ÉDITORIAL"
    Réf : docs/superpowers/specs/2026-04-12-coraly-design.md

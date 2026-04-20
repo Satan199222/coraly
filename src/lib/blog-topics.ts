@@ -118,3 +118,15 @@ export function getISOWeek(date: Date = new Date()): number {
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
 }
+
+/**
+ * Retourne l'année ISO de la semaine (peut différer de l'année civile
+ * pour les semaines 52/53/1 en début/fin d'année).
+ * Algorithme ISO 8601 : jeudi de la semaine détermine l'année.
+ */
+export function getISOYear(date: Date = new Date()): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayOfWeek = d.getUTCDay() || 7; // dimanche = 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayOfWeek);
+  return d.getUTCFullYear();
+}

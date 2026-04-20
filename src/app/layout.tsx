@@ -5,6 +5,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { THEME_INIT_SCRIPT } from "./theme-init";
 import { luciole } from "@/lib/fonts";
+import { SkipLink } from "@/components/a11y/SkipLink";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://coraly.fr";
 const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID;
@@ -211,12 +212,7 @@ export default function RootLayout({
           </Script>
         )}
 
-        <a
-          href="#main"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-[var(--accent)] focus:text-[var(--bg)] focus:px-4 focus:py-2 focus:rounded"
-        >
-          Aller au contenu principal
-        </a>
+        <SkipLink targetId="main" />
         {children}
         <Analytics />
         <SpeedInsights />
