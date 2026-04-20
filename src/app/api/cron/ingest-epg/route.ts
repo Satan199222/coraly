@@ -31,8 +31,8 @@ function isAuthorized(req: NextRequest): boolean {
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
-    console.warn("[cron/ingest-epg] CRON_SECRET non défini — accès non sécurisé");
-    return true;
+    console.error("[cron/ingest-epg] CRON_SECRET non défini — requête rejetée");
+    return false;
   }
   return authHeader === `Bearer ${cronSecret}`;
 }
